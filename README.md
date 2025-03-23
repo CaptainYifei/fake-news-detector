@@ -6,6 +6,7 @@
 ![应用截图](docs/images/screenshot.png)
 
 ## 项目结构
+```
 fake-news-detector/
 │
 ├── app.py                  # 主应用程序入口
@@ -19,7 +20,7 @@ fake-news-detector/
     ├── images/             # 文档中使用的图片
     │   └── screenshot.png  # 应用截图
     └── usage.md            # 详细使用说明
-
+```
 ## 项目特点
 
 - 🔍 **自动提取核心声明**：从新闻文本中提取可核查的核心声明
