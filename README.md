@@ -34,7 +34,7 @@ fake-news-detector/
 
 ### 前提条件
 
-- Python 3.8+
+- Python 3.12
 - 本地部署的Qwen2.5模型或其他兼容OpenAI API的大语言模型
 - BGE-M3嵌入模型（可选择本地部署或远程API）
 
