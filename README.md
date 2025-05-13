@@ -113,6 +113,6 @@ streamlit run app.py
 
 ## 联系方式
 
-项目维护者: CaptainYifei - [@CaptainYifei](https://github.com/CaptainYifei)
+Github项目链接: [https://github.com/CaptainYifei/fake-news-detector](https://github.com/CaptainYifei/fake-news-detector)
 
-项目链接: [https://github.com/CaptainYifei/fake-news-detector](https://github.com/CaptainYifei/fake-news-detector)
+Gitee项目链接: [https://gitee.com/love2eat/fake-news-detector](https://gitee.com/love2eat/fake-news-detector)
