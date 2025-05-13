@@ -102,9 +102,9 @@ streamlit run app.py
 欢迎贡献代码、提交问题或改进建议。请遵循以下步骤：
 
 1. Fork该仓库
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add some amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
+2. 创建功能分支 (`git checkout -b feature/xxx`)
+3. 提交更改 (`git commit -m 'Add xxx feature'`)
+4. 推送到分支 (`git push origin feature/xxx`)
 5. 创建Pull Request
 
 ## 许可证
