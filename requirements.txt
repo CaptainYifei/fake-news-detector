@@ -13,8 +13,9 @@ scikit-learn>=1.6.1
 pandas>=2.2.3
 pyarrow>=19.0.1
 regex>=2024.11.6
+fpdf2
 
-# AI相关
+# 模型相关
 torch>=2.6.0
 transformers>=4.49.0
 sentence-transformers>=3.4.1
