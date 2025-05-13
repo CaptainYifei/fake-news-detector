@@ -1,6 +1,6 @@
 # 虚假新闻检测器 (Fake News Detector)
 
-一个基于人工智能和语义搜索的虚假新闻自动检测系统，使用大型语言模型和BGE-M3嵌入实现多步骤事实核查。
+一个基于事实核查的虚假新闻自动检测系统，基于大型语言模型和BGE-M3-Embedding实现针对虚假新闻的事实核查，使用Streamlit构建Web界面。
 
 
 ![应用截图](docs/images/screenshot.png)
@@ -11,15 +11,19 @@ fake-news-detector/
 │
 ├── app.py                  # 主应用程序入口
 ├── fact_checker.py         # 事实核查核心逻辑
+├── auth.py                 # 用户认证系统
+├── db_utils.py             # 数据库操作工具
+├── pdf_export.py           # PDF报告生成
 ├── requirements.txt        # 项目依赖
-├── .gitignore              # Git忽略文件
-├── LICENSE                 # 开源许可证
-├── README.md               # 项目说明文档
+├── factcheck.db           # SQLite数据库（自动创建）
+├── .gitignore             # Git忽略文件
+├── LICENSE                # 开源许可证
+├── README.md              # 项目说明文档
 │
-└── docs/                   # 文档目录
-    ├── images/             # 文档中使用的图片
-    │   └── screenshot.png  # 应用截图
-    └── usage.md            # 详细使用说明
+└── docs/                  # 文档目录
+    ├── images/            # 文档中使用的图片
+    │   └── screenshot.png # 应用截图
+    └── usage.md           # 详细使用说明
 ```
 ## 项目特点
 
