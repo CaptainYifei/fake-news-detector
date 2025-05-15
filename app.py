@@ -7,6 +7,16 @@ import auth
 import db_utils
 from pdf_export import generate_fact_check_pdf
 
+from reportlab.pdfgen import canvas
+from io import BytesIO
+def generate_test_pdf():
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer)
+    c.drawString(100, 750, "这是一个测试PDF")
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
 # 初始化数据库
 db_utils.init_db()
 
@@ -308,22 +318,40 @@ def show_history_detail_page():
     # 显示导出选项
     st.divider()
     st.subheader("导出报告")
-    
+
     # 创建PDF导出按钮
-    pdf_data = generate_fact_check_pdf(history_item)
-    
-    # 生成文件名
-    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"事实核查报告_{current_time}.pdf"
-    
-    # 提供下载按钮
-    st.download_button(
-        label="导出为PDF",
-        data=pdf_data,
-        file_name=filename,
-        mime="application/pdf",
-        help="将当前核查结果导出为PDF文件"
-    )
+    try:
+        pdf_data = generate_fact_check_pdf(history_item)
+        
+        # 生成文件名
+        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"事实核查报告_{current_time}.pdf"
+        # print("*****",filename)
+        # print("*****",pdf_data)
+        with open("test.pdf", "wb") as f:
+            f.write(pdf_data)
+        import base64
+
+        # 使用HTML强制下载
+        pdf_b64 = base64.b64encode(pdf_data).decode()
+        href = f"""
+        <a href="data:application/pdf;base64,{pdf_b64}" 
+        download="{filename}" 
+        target="_blank"
+        style="display: inline-block; padding: 0.25em 0.5em; 
+        background-color: #4CAF50; color: white; 
+        text-decoration: none; border-radius: 4px;">
+        导出为PDF
+        </a>
+        """
+        st.markdown(href, unsafe_allow_html=True)
+        # test_data = "这是测试文本".encode('utf-8')
+        # st.download_button("测试下载", test_data, "test.txt", "text/plain")
+    except Exception as e:
+        st.error(f"PDF生成错误: {str(e)}")
+        st.info("请确保已安装ReportLab库: pip install reportlab")
+
+
 
 # 全局状态初始化
 if 'page' not in st.session_state:
