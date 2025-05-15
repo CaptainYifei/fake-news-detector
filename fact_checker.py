@@ -1,509 +1,325 @@
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.enums import TA_LEFT, TA_CENTER
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-from io import BytesIO
-from datetime import datetime
 import os
+from datetime import datetime
+from typing import Dict, List, Tuple, Any
+import streamlit as st
+from openai import OpenAI
+import requests
+from duckduckgo_search import DDGS
+import numpy as np
 import re
-import tempfile
-import logging
-import platform
+from FlagEmbedding import BGEM3FlagModel
 
-# 设置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("pdf_export")
-
-# 检测系统
-system = platform.system()
-logger.info(f"当前操作系统: {system}")
-
-# 尝试加载中文字体
-try:
-    # 首先尝试注册思源宋体（Adobe Source Han Sans）
-    pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
-    chinese_font = 'STSong-Light'
-    logger.info("成功加载内置中文字体: STSong-Light")
-except Exception as e:
-    logger.warning(f"无法加载内置中文字体 STSong-Light: {e}")
-    
-    # 尝试使用系统中文字体作为备选
-    font_paths = []
-    
-    if system == 'Linux':
-        font_paths = [
-            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-            "/usr/share/fonts/truetype/arphic/uming.ttc",
-            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-        ]
-    elif system == 'Darwin':  # macOS
-        font_paths = [
-            "/System/Library/Fonts/PingFang.ttc",
-            "/System/Library/Fonts/STHeiti Light.ttc",
-            "/System/Library/Fonts/Hiragino Sans GB.ttc"
-        ]
-    elif system == 'Windows':
-        font_paths = [
-            "C:/Windows/Fonts/simhei.ttf",
-            "C:/Windows/Fonts/simsun.ttc",
-            "C:/Windows/Fonts/msyh.ttf"
-        ]
-    
-    # 添加可能与应用程序一起分发的字体
-    font_paths.extend([
-        os.path.join(os.path.dirname(__file__), "fonts/simhei.ttf"),
-        os.path.join(os.path.dirname(__file__), "fonts/wqy-microhei.ttc"),
-        "simhei.ttf",
-        "wqy-microhei.ttc"
-    ])
-    
-    font_loaded = False
-    for font_path in font_paths:
-        try:
-            if os.path.exists(font_path):
-                logger.info(f"尝试加载字体: {font_path}")
-                pdfmetrics.registerFont(TTFont('ChineseFont', font_path))
-                chinese_font = 'ChineseFont'
-                font_loaded = True
-                logger.info(f"成功加载中文字体: {font_path}")
-                break
-        except Exception as e:
-            logger.warning(f"加载字体 {font_path} 失败: {e}")
-    
-    # 如果没有找到任何可用的中文字体，使用默认字体
-    if not font_loaded:
-        chinese_font = 'Helvetica'
-        logger.warning("未找到可用的中文字体，将使用Helvetica（可能导致中文乱码）")
-
-
-def clean_html(text):
-    """清理可能的HTML标签并处理内容"""
-    if text is None:
-        return ""
+class FactChecker:
+    def __init__(self, api_base: str, model: str, temperature: float, max_tokens: int):
+        """
+        Initialize the fact checker with configuration parameters.
         
-    # 将text转换为字符串
-    text = str(text)
-    
-    # 清理HTML标签
-    clean = re.compile('<.*?>')
-    text = re.sub(clean, '', text)
-    
-    # 移除不可见字符
-    text = ''.join(c for c in text if ord(c) >= 32 or ord(c) == 9)
-    
-    # 处理换行和空格
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
-    
-    return text
+        Args:
+            api_base: The base URL for the LLM API
+            model: The model to use for fact checking
+            temperature: Temperature parameter for LLM
+            max_tokens: Maximum tokens for LLM response
+        """
+        self.api_base = api_base
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.openai_api_key = "EMPTY"  # Placeholder for local setup
+        
+        # Initialize the OpenAI client with local settings
+        self.client = OpenAI(
+            api_key=self.openai_api_key,
+            base_url=self.api_base,
+        )
+        
+        # Initialize the embedding model
+        try:
+            # self.embedding_model = BGEM3FlagModel('BAAI/bge-m3',  
+            #            use_fp16=True)
+            self.embedding_model = BGEM3FlagModel('/home/user1/wyf/model/bge-m3/')
+        except Exception as e:
+            st.error(f"Error loading BGE-M3 model: {str(e)}")
+            self.embedding_model = None
+
+    def extract_claim(self, text: str) -> str:
+        """
+        Extract core claims from the input text using LLM.
+        
+        Args:
+            text: The input text to extract claims from
+            
+        Returns:
+            extracted claim
+        """
+        system_prompt = """
+        You are a precise claim extraction assistant. Analyze the provided news and summarize the central idea of it.
+        Format the central idea as a worthy-check statement, which is a claim that can be verified independently.
+        output format:
+        calim: <claim>
+        """
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Extract the key factual claims from this text: {text}"}
+                ],
+                temperature=0.0,  # Use low temperature for consistent claim extraction
+                max_tokens=500
+            )
+            
+            claims_text = response.choices[0].message.content
+            
+            # Parse the numbered list into separate claims
+            claims = re.findall(r'\d+\.\s+(.*?)(?=\n\d+\.|\Z)', claims_text, re.DOTALL)
+            
+            # Clean up the claims
+            claims = [claim.strip() for claim in claims if claim.strip()]
+            
+            # If no numbered claims were found, split by newlines
+            if not claims and claims_text.strip():
+                claims = [line.strip() for line in claims_text.strip().split('\n') if line.strip()]
+            
+            return claims[0]
+            
+        except Exception as e:
+            st.error(f"Error extracting claims: {str(e)}")
+            return text  # Return the original text as a fallback
+
+    def search_evidence(self, claim: str, num_results: int = 5) -> List[Dict[str, str]]:
+        """
+        Search for evidence using DuckDuckGo.
+        
+        Args:
+            claim: The claim to search for evidence
+            num_results: Number of search results to return
+            
+        Returns:
+            List of evidence documents with title, url, and snippet
+        """
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+            }
+            ddgs = DDGS(proxy="socks5://127.0.0.1:20170", timeout=60, headers=headers)
+            results = list(ddgs.text(claim, max_results=num_results))
+            
+            evidence_docs = []
+            for result in results:
+                evidence_docs.append({
+                    'title': result.get('title', ''),
+                    'url': result.get('href', ''),
+                    'snippet': result.get('body', '')
+                })
+            
+            return evidence_docs
+        except Exception as e:
+            st.error(f"Error searching for evidence: {str(e)}")
+            return []
+
+    def get_evidence_chunks(self, evidence_docs: List[Dict[str, str]], claim: str, chunk_size: int = 200, chunk_overlap: int = 50, top_k: int = 10) -> List[Dict[str, Any]]:
+        """
+        Extract and rank evidence chunks related to the claim using BGE-M3.
+        
+        Args:
+            evidence_docs: List of evidence documents
+            claim: The claim to match with evidence
+            chunk_size: Size of text chunks in characters
+            chunk_overlap: Overlap between chunks in characters
+            top_k: Number of top chunks to return
+            
+        Returns:
+            List of ranked evidence chunks with similarity scores
+        """
+        if not self.embedding_model:
+            return [{
+                'text': "Evidence ranking unavailable - BGE-M3 model could not be loaded.",
+                'source': "System",
+                'similarity': 0.0
+            }]
+        
+        try:
+            # Create text chunks from evidence documents
+            all_chunks = []
+            
+            for doc in evidence_docs:
+                # Add title as a separate chunk
+                all_chunks.append({
+                    'text': doc['title'],
+                    'source': doc['url'],
+                })
+                
+                # Process the snippet into overlapping chunks
+                snippet = doc['snippet']
+                if len(snippet) <= chunk_size:
+                    # If snippet is shorter than chunk_size, use it as is
+                    all_chunks.append({
+                        'text': snippet,
+                        'source': doc['url'],
+                    })
+                else:
+                    # Create overlapping chunks
+                    for i in range(0, len(snippet), chunk_size - chunk_overlap):
+                        chunk_text = snippet[i:i + chunk_size]
+                        if len(chunk_text) >= chunk_size // 2:  # Only keep chunks of reasonable size
+                            all_chunks.append({
+                                'text': chunk_text,
+                                'source': doc['url'],
+                            })
+            
+            # Compute embeddings for claim
+            claim_embedding = self.embedding_model.encode(claim)['dense_vecs']
+            
+            # Compute embeddings for chunks
+            chunk_texts = [chunk['text'] for chunk in all_chunks]
+            chunk_embeddings = self.embedding_model.encode(chunk_texts)['dense_vecs']
+            
+            # Calculate similarities
+            similarities = []
+            for i, chunk_embedding in enumerate(chunk_embeddings):
+                similarity = np.dot(claim_embedding, chunk_embedding) / (
+                    np.linalg.norm(claim_embedding) * np.linalg.norm(chunk_embedding)
+                )
+                similarities.append(float(similarity))
+            
+            # Add similarities to chunks
+            for i, similarity in enumerate(similarities):
+                all_chunks[i]['similarity'] = similarity
+            
+            # Sort chunks by similarity (descending)
+            ranked_chunks = sorted(all_chunks, key=lambda x: x['similarity'], reverse=True)
+            
+            # Return top k chunks
+            return ranked_chunks[:top_k]
+            
+        except Exception as e:
+            st.error(f"Error ranking evidence: {str(e)}")
+            return [{
+                'text': f"Error ranking evidence: {str(e)}",
+                'source': "System",
+                'similarity': 0.0
+            }]
+    def evaluate_claim(self, claim: str, evidence_chunks: List[Dict[str, Any]]) -> Dict[str, str]:
+        """
+        Evaluate the truthfulness of a claim based on evidence using LLM.
+        
+        Args:
+            claim: The claim to evaluate
+            evidence_chunks: The evidence chunks to use for evaluation
+            
+        Returns:
+            Dictionary with verdict and reasoning
+        """
+        system_prompt = """
+        You are a precise fact-checking assistant. Analyze the claim provided and determine its accuracy based on the evidence provided.
+        
+        Follow these steps:
+        1. Consider each piece of evidence carefully
+        2. Evaluate how the evidence supports or contradicts the claim
+        3. Provide a clear verdict: TRUE, FALSE, or PARTIALLY TRUE
+        4. Explain your reasoning with specific references to the evidence
+        
+        Format your response as:
+        
+        VERDICT: [TRUE/FALSE/PARTIALLY TRUE]
+        
+        REASONING: [Your detailed explanation citing specific evidence]
+        
+        Remain neutral, objective, and focus solely on what the evidence shows. Don't speculate beyond the provided evidence.
+        """
+        
+        # Prepare evidence text for the prompt
+        evidence_text = "\n\n".join([
+            f"EVIDENCE {i+1} (Relevance: {chunk['similarity']:.2f}):\n{chunk['text']}\nSource: {chunk['source']}"
+            for i, chunk in enumerate(evidence_chunks)
+        ])
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"CLAIM: {claim}\n\nEVIDENCE:\n{evidence_text}"}
+                ],
+                temperature=self.temperature,
+                max_tokens=self.max_tokens
+            )
+            
+            result_text = response.choices[0].message.content
+            
+            # Extract verdict and reasoning
+            verdict_match = re.search(r'VERDICT:\s*(TRUE|FALSE|PARTIALLY TRUE)', result_text, re.IGNORECASE)
+            verdict = verdict_match.group(1) if verdict_match else "UNVERIFIABLE"
+            
+            reasoning_match = re.search(r'REASONING:\s*(.*)', result_text, re.DOTALL)
+            reasoning = reasoning_match.group(1).strip() if reasoning_match else result_text
+            
+            return {
+                "verdict": verdict,
+                "reasoning": reasoning
+            }
+            
+        except Exception as e:
+            st.error(f"Error evaluating claim: {str(e)}")
+            return {
+                "verdict": "ERROR",
+                "reasoning": f"An error occurred during evaluation: {str(e)}"
+            }
+
+    def check_fact(self, text: str) -> Dict[str, Any]:
+        """
+        Main function to check the factuality of a statement.
+        
+        Args:
+            text: The statement to fact-check
+            
+        Returns:
+            Dictionary with all results of the fact-checking process
+        """
+        # 1. Extract core claim
+        claim = self.extract_claim(text)
+        
+        result = {
+            "original_text": text,
+            "claim": claim,
+            "results": []
+        }
+        # 2. Search for evidence
+        evidence_docs = self.search_evidence(claim)
+        
+        # 3. Get relevant evidence chunks
+        evidence_chunks = self.get_evidence_chunks(evidence_docs, claim)
+        
+        # 4. Evaluate claim based on evidence
+        evaluation = self.evaluate_claim(claim, evidence_chunks)
+        
+        # Add results for this claim
+        result={
+            "claim": claim,
+            "evidence_docs": evidence_docs,
+            "evidence_chunks": evidence_chunks,
+            "verdict": evaluation["verdict"],
+            "reasoning": evaluation["reasoning"]
+        }
+        
+        return result
 
 
-def generate_fact_check_pdf(history_item):
-    """生成事实核查报告的PDF
+# Function to be imported in the main Streamlit app
+def check_fact(claim: str, api_base: str, model: str, temperature: float, max_tokens: int) -> Dict[str, Any]:
+    """
+    Public interface for fact checking to be used by the Streamlit app.
     
     Args:
-        history_item: 包含核查历史详情的字典
-    
+        claim: The statement to fact-check
+        api_base: The base URL for the LLM API
+        model: The model to use for fact checking
+        temperature: Temperature parameter for LLM
+        max_tokens: Maximum tokens for LLM response
+        
     Returns:
-        BytesIO: 包含PDF数据的BytesIO对象
+        Dictionary with all results of the fact-checking process
     """
-    logger.info("开始生成PDF报告")
-    
-    try:
-        # 尝试使用xhtml2pdf作为备选方案
-        logger.info("尝试使用直接canvas方法生成PDF")
-        return generate_pdf_with_canvas(history_item)
-    except Exception as e:
-        logger.error(f"使用canvas方法生成PDF失败: {e}")
-        logger.info("尝试使用reportlab的SimpleDocTemplate方法生成PDF")
-        try:
-            return generate_pdf_with_template(history_item)
-        except Exception as e:
-            logger.error(f"使用SimpleDocTemplate方法生成PDF失败: {e}")
-            # 生成一个最简单的PDF以确保功能正常
-            return generate_simple_pdf(history_item)
-
-
-def generate_pdf_with_canvas(history_item):
-    """使用Canvas直接绘制PDF（适用于中文）"""
-    buffer = BytesIO()
-    
-    # 页面设置
-    page_width, page_height = A4
-    margin = 72  # 1英寸边距
-    text_width = page_width - 2 * margin  # 文本区域宽度
-    
-    # 创建Canvas
-    c = canvas.Canvas(buffer, pagesize=A4)
-    c.setTitle("事实核查报告")
-    
-    # 设置中文字体
-    c.setFont(chinese_font, 18)
-    
-    # 添加标题
-    title = "事实核查报告"
-    title_width = c.stringWidth(title, chinese_font, 18)
-    c.drawString((page_width - title_width) / 2, page_height - margin, title)
-    
-    # 添加生成时间
-    c.setFont(chinese_font, 10)
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.drawString(margin, page_height - margin - 30, f"生成时间: {current_time}")
-    
-    # 当前Y位置（从上到下递减）
-    y_position = page_height - margin - 60
-    
-    # 文本绘制函数 - 改进的自动换行算法
-    def draw_text_block(title, content, start_y):
-        # 绘制小标题
-        c.setFont(chinese_font, 14)
-        c.drawString(margin, start_y, title)
-        start_y -= 20
-        
-        # 绘制内容
-        c.setFont(chinese_font, 10)
-        
-        # 处理文本内容
-        content = clean_html(content)
-        
-        # 更好的中文文本换行算法
-        def wrap_chinese_text(text, line_width, font_name, font_size):
-            """中文和英文混合的文本换行算法"""
-            if not text:
-                return []
-                
-            lines = []
-            line = ""
-            
-            # 先按自然段落拆分
-            paragraphs = text.split('\n')
-            
-            for paragraph in paragraphs:
-                if not paragraph.strip():
-                    lines.append("")
-                    continue
-                    
-                # 针对中文，我们按字符处理
-                # 中文没有自然的单词分隔，每个字符都可以是换行点
-                chars = list(paragraph)
-                line = chars[0] if chars else ""
-                
-                for char in chars[1:]:
-                    test_line = line + char
-                    width = c.stringWidth(test_line, font_name, font_size)
-                    
-                    if width <= line_width:
-                        line = test_line
-                    else:
-                        lines.append(line)
-                        line = char
-                
-                if line:
-                    lines.append(line)
-            
-            return lines
-        
-        # 使用改进的换行算法
-        lines = wrap_chinese_text(content, text_width, chinese_font, 10)
-        
-        # 绘制文本行
-        for line in lines:
-            if start_y < margin:  # 如果到达页面底部，则添加新页面
-                c.showPage()
-                c.setFont(chinese_font, 10)
-                start_y = page_height - margin
-            
-            c.drawString(margin, start_y, line)
-            start_y -= 15
-        
-        return start_y - 15  # 返回下一部分的起始Y位置
-    
-    # 绘制原始文本
-    y_position = draw_text_block("原始文本", history_item['original_text'], y_position)
-    
-    # 绘制核心声明
-    y_position = draw_text_block("核心声明", history_item['claim'], y_position)
-    
-    # 获取判断结果对应的表情和中文
-    verdict = history_item['verdict'].upper()
-    if verdict == "TRUE":
-        emoji = "✓"
-        verdict_cn = "正确"
-    elif verdict == "FALSE":
-        emoji = "✗"
-        verdict_cn = "错误"
-    elif verdict == "PARTIALLY TRUE":
-        emoji = "!"
-        verdict_cn = "部分正确"
-    else:
-        emoji = "?"
-        verdict_cn = "无法验证"
-    
-    # 绘制结论
-    c.setFont(chinese_font, 14)
-    if y_position < margin:  # 检查是否需要新页面
-        c.showPage()
-        c.setFont(chinese_font, 14)
-        y_position = page_height - margin
-    
-    # c.drawString(margin, y_position, f"结论: {emoji} {verdict_cn}")
-    # emoji无法渲染
-    c.drawString(margin, y_position, f"结论: {verdict_cn}")
-    y_position -= 20
-    
-    # 绘制推理过程
-    y_position = draw_text_block("推理过程", history_item['reasoning'], y_position)
-    
-    # 绘制证据来源
-    c.setFont(chinese_font, 14)
-    if y_position < margin:  # 检查是否需要新页面
-        c.showPage()
-        c.setFont(chinese_font, 14)
-        y_position = page_height - margin
-    
-    c.drawString(margin, y_position, "证据来源")
-    y_position -= 20
-    
-    # 绘制每条证据
-    for j, chunk in enumerate(history_item['evidence']):
-        c.setFont(chinese_font, 10)
-        if y_position < margin:  # 检查是否需要新页面
-            c.showPage()
-            c.setFont(chinese_font, 10)
-            y_position = page_height - margin
-        
-        c.drawString(margin, y_position, f"[{j+1}]:")
-        y_position -= 15
-        
-        # 绘制证据文本
-        text_lines = clean_html(chunk['text']).split('\n')
-        for line in text_lines:
-            if y_position < margin:  # 检查是否需要新页面
-                c.showPage()
-                c.setFont(chinese_font, 10)
-                y_position = page_height - margin
-            
-            c.drawString(margin, y_position, line)
-            y_position -= 15
-        
-        # 绘制来源
-        if y_position < margin:  # 检查是否需要新页面
-            c.showPage()
-            c.setFont(chinese_font, 10)
-            y_position = page_height - margin
-        
-        c.drawString(margin, y_position, f"来源: {clean_html(chunk['source'])}")
-        y_position -= 15
-        
-        # 绘制相关性
-        if 'similarity' in chunk and chunk['similarity'] is not None:
-            if y_position < margin:  # 检查是否需要新页面
-                c.showPage()
-                c.setFont(chinese_font, 10)
-                y_position = page_height - margin
-            
-            c.drawString(margin, y_position, f"相关性: {chunk['similarity']:.2f}")
-            y_position -= 15
-        
-        y_position -= 10  # 证据之间的额外间距
-    
-    # 保存PDF
-    c.save()
-    
-    # 重置缓冲区位置
-    buffer.seek(0)
-    
-    # 返回PDF数据
-    return buffer.getvalue()
-
-
-def generate_pdf_with_template(history_item):
-    """使用SimpleDocTemplate生成PDF（传统方法）"""
-    buffer = BytesIO()
-    
-    # 创建PDF文档
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=72,
-        leftMargin=72,
-        topMargin=72,
-        bottomMargin=72
-    )
-    
-    # 定义样式
-    styles = getSampleStyleSheet()
-    
-    # 创建中文标题样式
-    title_style = ParagraphStyle(
-        'ChineseTitle',
-        parent=styles['Title'],
-        fontName=chinese_font,
-        fontSize=18,
-        alignment=1,  # 居中
-        wordWrap='CJK'  # 关键：使用CJK单词换行模式
-    )
-    
-    # 创建中文正文样式
-    normal_style = ParagraphStyle(
-        'ChineseNormal',
-        parent=styles['Normal'],
-        fontName=chinese_font,
-        fontSize=10,
-        leading=14,  # 行间距
-        wordWrap='CJK'  # 关键：使用CJK单词换行模式
-    )
-    
-    # 创建中文小标题样式
-    heading_style = ParagraphStyle(
-        'ChineseHeading',
-        parent=styles['Heading2'],
-        fontName=chinese_font,
-        fontSize=14,
-        wordWrap='CJK'  # 关键：使用CJK单词换行模式
-    )
-    
-    # 获取判断结果对应的表情和中文
-    verdict = history_item['verdict'].upper()
-    if verdict == "TRUE":
-        emoji = "✓"  # PDF中使用简单符号
-        verdict_cn = "正确"
-    elif verdict == "FALSE":
-        emoji = "✗"
-        verdict_cn = "错误"
-    elif verdict == "PARTIALLY TRUE":
-        emoji = "!"
-        verdict_cn = "部分正确"
-    else:
-        emoji = "?"
-        verdict_cn = "无法验证"
-    
-    # 报告内容列表
-    content = []
-    
-    # 添加标题
-    content.append(Paragraph("事实核查报告", title_style))
-    content.append(Spacer(1, 12))
-    
-    # 添加生成时间
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    content.append(Paragraph(f"生成时间: {current_time}", normal_style))
-    content.append(Spacer(1, 12))
-    
-    # 添加原始文本
-    content.append(Paragraph("原始文本", heading_style))
-    content.append(Spacer(1, 6))
-    
-    # 使用安全的文本处理方式
-    try:
-        original_text = clean_html(history_item['original_text'])
-        content.append(Paragraph(original_text, normal_style))
-    except Exception as e:
-        logger.error(f"处理原始文本时出错: {e}")
-        content.append(Paragraph("无法显示原始文本", normal_style))
-    
-    content.append(Spacer(1, 12))
-    
-    # 添加核心声明
-    content.append(Paragraph("核心声明", heading_style))
-    content.append(Spacer(1, 6))
-    try:
-        claim_text = clean_html(history_item['claim'])
-        content.append(Paragraph(claim_text, normal_style))
-    except Exception as e:
-        logger.error(f"处理核心声明时出错: {e}")
-        content.append(Paragraph("无法显示核心声明", normal_style))
-    
-    content.append(Spacer(1, 12))
-    
-    # 添加判断结果
-    # content.append(Paragraph(f"结论: {emoji} {verdict_cn}", heading_style))
-    # emoji无法渲染
-    content.append(Paragraph(f"结论: {verdict_cn}", heading_style))
-    content.append(Spacer(1, 12))
-    
-    # 添加推理过程
-    content.append(Paragraph("推理过程", heading_style))
-    content.append(Spacer(1, 6))
-    try:
-        reasoning_text = clean_html(history_item['reasoning'])
-        content.append(Paragraph(reasoning_text, normal_style))
-    except Exception as e:
-        logger.error(f"处理推理过程时出错: {e}")
-        content.append(Paragraph("无法显示推理过程", normal_style))
-    
-    content.append(Spacer(1, 12))
-    
-    # 添加证据来源
-    content.append(Paragraph("证据来源", heading_style))
-    content.append(Spacer(1, 6))
-    
-    for j, chunk in enumerate(history_item['evidence']):
-        try:
-            content.append(Paragraph(f"[{j+1}]:", normal_style))
-            chunk_text = clean_html(chunk['text'])
-            content.append(Paragraph(chunk_text, normal_style))
-            source_text = clean_html(chunk['source'])
-            content.append(Paragraph(f"来源: {source_text}", normal_style))
-            if 'similarity' in chunk and chunk['similarity'] is not None:
-                content.append(Paragraph(f"相关性: {chunk['similarity']:.2f}", normal_style))
-            content.append(Spacer(1, 6))
-        except Exception as e:
-            logger.error(f"处理证据 {j+1} 时出错: {e}")
-            content.append(Paragraph(f"无法显示证据 {j+1}", normal_style))
-            content.append(Spacer(1, 6))
-    
-    # 构建PDF
-    doc.build(content)
-    
-    # 重置缓冲区位置
-    buffer.seek(0)
-    
-    # 返回PDF数据
-    return buffer.getvalue()
-
-
-def generate_simple_pdf(history_item):
-    """生成一个简单的PDF，确保至少有一些内容可以下载"""
-    logger.info("生成简单PDF作为最后的备选方案")
-    buffer = BytesIO()
-    
-    # 创建Canvas
-    c = canvas.Canvas(buffer, pagesize=A4)
-    
-    # 设置字体为Helvetica（内置字体，支持ASCII）
-    c.setFont("Helvetica", 16)
-    c.drawString(72, A4[1]-108, "Fact Check Report")
-    
-    c.setFont("Helvetica", 12)
-    c.drawString(72, A4[1]-140, "Generated on: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    
-    # 获取判断结果
-    verdict = history_item['verdict'].upper()
-    if verdict == "TRUE":
-        verdict_text = "TRUE"
-    elif verdict == "FALSE":
-        verdict_text = "FALSE"
-    elif verdict == "PARTIALLY TRUE":
-        verdict_text = "PARTIALLY TRUE"
-    else:
-        verdict_text = "UNVERIFIABLE"
-    
-    c.drawString(72, A4[1]-180, "Verdict: " + verdict_text)
-    
-    # 添加注释说明PDF有问题
-    c.setFont("Helvetica", 10)
-    c.drawString(72, 72, "Note: There was an issue generating the complete PDF with Chinese characters.")
-    c.drawString(72, 58, "Please check the application interface for complete results.")
-    
-    c.save()
-    
-    # 重置缓冲区位置
-    buffer.seek(0)
-    
-    # 返回PDF数据
-    return buffer.getvalue()
+    checker = FactChecker(api_base, model, temperature, max_tokens)
+    return checker.check_fact(claim)

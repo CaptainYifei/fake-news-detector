@@ -135,6 +135,7 @@ def generate_pdf_with_canvas(history_item):
     # 页面设置
     page_width, page_height = A4
     margin = 72  # 1英寸边距
+    text_width = page_width - 2 * margin  # 文本区域宽度
     
     # 创建Canvas
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -156,7 +157,7 @@ def generate_pdf_with_canvas(history_item):
     # 当前Y位置（从上到下递减）
     y_position = page_height - margin - 60
     
-    # 文本绘制函数
+    # 文本绘制函数 - 改进的自动换行算法
     def draw_text_block(title, content, start_y):
         # 绘制小标题
         c.setFont(chinese_font, 14)
@@ -166,30 +167,48 @@ def generate_pdf_with_canvas(history_item):
         # 绘制内容
         c.setFont(chinese_font, 10)
         
-        # 处理多行文本
+        # 处理文本内容
         content = clean_html(content)
-        lines = []
         
-        # 手动切分行
-        current_line = ""
-        words = content.split()
+        # 更好的中文文本换行算法
+        def wrap_chinese_text(text, line_width, font_name, font_size):
+            """中文和英文混合的文本换行算法"""
+            if not text:
+                return []
+                
+            lines = []
+            line = ""
+            
+            # 先按自然段落拆分
+            paragraphs = text.split('\n')
+            
+            for paragraph in paragraphs:
+                if not paragraph.strip():
+                    lines.append("")
+                    continue
+                    
+                # 针对中文，我们按字符处理
+                # 中文没有自然的单词分隔，每个字符都可以是换行点
+                chars = list(paragraph)
+                line = chars[0] if chars else ""
+                
+                for char in chars[1:]:
+                    test_line = line + char
+                    width = c.stringWidth(test_line, font_name, font_size)
+                    
+                    if width <= line_width:
+                        line = test_line
+                    else:
+                        lines.append(line)
+                        line = char
+                
+                if line:
+                    lines.append(line)
+            
+            return lines
         
-        for word in words:
-            test_line = current_line + " " + word if current_line else word
-            # 检查是否超出页面宽度
-            if c.stringWidth(test_line, chinese_font, 10) < (page_width - 2 * margin):
-                current_line = test_line
-            else:
-                lines.append(current_line)
-                current_line = word
-        
-        if current_line:
-            lines.append(current_line)
-        
-        # 如果没有成功拆分行，则按固定长度拆分
-        if not lines:
-            chunk_size = 80  # 每行大约80个字符
-            lines = [content[i:i+chunk_size] for i in range(0, len(content), chunk_size)]
+        # 使用改进的换行算法
+        lines = wrap_chinese_text(content, text_width, chinese_font, 10)
         
         # 绘制文本行
         for line in lines:
@@ -231,7 +250,9 @@ def generate_pdf_with_canvas(history_item):
         c.setFont(chinese_font, 14)
         y_position = page_height - margin
     
-    c.drawString(margin, y_position, f"结论: {emoji} {verdict_cn}")
+    # c.drawString(margin, y_position, f"结论: {emoji} {verdict_cn}")
+    # emoji无法渲染
+    c.drawString(margin, y_position, f"结论: {verdict_cn}")
     y_position -= 20
     
     # 绘制推理过程
@@ -400,7 +421,9 @@ def generate_pdf_with_template(history_item):
     content.append(Spacer(1, 12))
     
     # 添加判断结果
-    content.append(Paragraph(f"结论: {emoji} {verdict_cn}", heading_style))
+    # content.append(Paragraph(f"结论: {emoji} {verdict_cn}", heading_style))
+    # emoji无法渲染
+    content.append(Paragraph(f"结论: {verdict_cn}", heading_style))
     content.append(Spacer(1, 12))
     
     # 添加推理过程
