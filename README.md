@@ -9,20 +9,25 @@
 ```
 fake-news-detector/
 │
-├── app.py                  # 主应用程序入口
-├── fact_checker.py         # 事实核查核心逻辑
-├── auth.py                 # 用户认证系统
-├── db_utils.py             # 数据库操作工具
-├── pdf_export.py           # PDF报告生成
-├── requirements.txt        # 项目依赖
-├── factcheck.db           # SQLite数据库（自动创建）
+├── app.py                 # 主应用程序入口
+├── fact_checker.py        # 事实核查核心逻辑
+├── auth.py                # 用户认证系统
+├── db_utils.py            # 数据库操作工具
+├── pdf_export.py          # PDF报告生成
+├── requirements.txt       # 项目依赖
+├── api.py                 # API接口
+├── gunicorn.conf.py       # Gunicorn配置
+├── start_server.sh        #API启动脚本
 ├── .gitignore             # Git忽略文件
 ├── LICENSE                # 开源许可证
 ├── README.md              # 项目说明文档
 │
+├── test/                  # 测试目录
+│   ├── api_test_page.html # api测试代码
 └── docs/                  # 文档目录
     ├── images/            # 文档中使用的图片
     │   └── screenshot.png # 应用截图
+    ├── api_doc.html       # API文档
     └── usage.md           # 详细使用说明
 ```
 ## 项目特点
