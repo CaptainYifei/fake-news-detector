@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI虚假新闻检测 API 测试页面</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+            --border-color: #ddd;
+            --code-bg: #f5f5f5;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 0;
+            margin: 0;
+        }
+        
+        header {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 1.5rem 0;
+            text-align: center;
+        }
+        
+        header h1 {
+            margin-bottom: 0.5rem;
+        }
+        
+        header p {
+            opacity: 0.8;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        nav {
+            background-color: var(--primary-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        nav ul {
+            display: flex;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        nav ul li {
+            padding: 0;
+        }
+        
+        nav ul li a {
+            display: block;
+            color: white;
+            text-decoration: none;
+            padding: 1rem 1.5rem;
+            transition: background-color 0.3s;
+        }
+        
+        nav ul li a:hover, nav ul li a.active {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        section {
+            padding: 2rem 0;
+        }
+        
+        h2 {
+            color: var(--secondary-color);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        h3 {
+            color: var(--primary-color);
+            margin: 1rem 0 0.5rem;
+        }
+        
+        p {
+            margin-bottom: 1rem;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+        
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+        
+        .btn {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-success {
+            background-color: var(--success-color);
+        }
+        
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .btn-block {
+            display: block;
+            width: 100%;
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        
+        .alert-success {
+            background-color: rgba(46, 204, 113, 0.1);
+            border-left: 4px solid var(--success-color);
+        }
+        
+        .alert-danger {
+            background-color: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid var(--danger-color);
+        }
+        
+        .alert-warning {
+            background-color: rgba(243, 156, 18, 0.1);
+            border-left: 4px solid var(--warning-color);
+        }
+        
+        .info-box {
+            background-color: rgba(52, 152, 219, 0.1);
+            border-left: 4px solid var(--primary-color);
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        pre {
+            background-color: var(--code-bg);
+            padding: 1rem;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid var(--border-color);
+        }
+        
+        code {
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .tab-btn {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border: none;
+            background-color: transparent;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        
+        .tab-btn.active {
+            border-bottom: 3px solid var(--primary-color);
+            font-weight: bold;
+        }
+        
+        .response-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .verdict-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .verdict-true {
+            background-color: var(--success-color);
+        }
+        
+        .verdict-false {
+            background-color: var(--danger-color);
+        }
+        
+        .verdict-partially {
+            background-color: var(--warning-color);
+        }
+        
+        .verdict-unverifiable {
+            background-color: #95a5a6;
+        }
+        
+        .evidence-container {
+            margin-top: 1rem;
+        }
+        
+        .evidence-item {
+            background-color: rgba(0, 0, 0, 0.025);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .evidence-source {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+        
+        .similarity-badge {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            background-color: rgba(52, 152, 219, 0.1);
+            color: var(--primary-color);
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+        }
+        
+        .examples-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .example-item {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .example-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .example-title {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .example-content {
+            color: #666;
+            font-size: 0.9rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+        
+        .copy-btn {
+            background-color: transparent;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        footer {
+            background-color: var(--secondary-color);
+            color: white;
+            text-align: center;
+            padding: 1.5rem 0;
+            margin-top: 2rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 15px;
+            }
+            
+            nav ul {
+                flex-direction: column;
+            }
+            
+            .examples-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>AI虚假新闻检测 API 测试页面</h1>
+            <p>使用本页面测试虚假新闻检测API的功能</p>
+        </div>
+    </header>
+    
+    <nav>
+        <div class="container">
+            <ul>
+                <li><a href="#" class="tab-link active" data-tab="test-api">测试API</a></li>
+                <li><a href="#" class="tab-link" data-tab="examples">示例新闻</a></li>
+                <li><a href="#" class="tab-link" data-tab="history">测试历史</a></li>
+                <li><a href="#" class="tab-link" data-tab="api-info">API信息</a></li>
+            </ul>
+        </div>
+    </nav>
+    
+    <main class="container">
+        <!-- 测试API选项卡 -->
+        <section id="test-api" class="tab-content active">
+            <h2>测试新闻检测API</h2>
+            
+            <div class="card">
+                <form id="checkForm">
+                    <div class="form-group">
+                        <label for="news-text">新闻文本</label>
+                        <textarea id="news-text" placeholder="输入需要检测的新闻文本..." required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="api-base">API基础URL（可选）</label>
+                        <input type="text" id="api-base" value="http://localhost:8000/v1" placeholder="例如：http://localhost:8000/v1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="model">模型选择（可选）</label>
+                        <select id="model">
+                            <option value="Qwen2.5-14B-Instruct-AWQ">Qwen2.5-14B-Instruct-AWQ</option>
+                            <option value="Qwen2.5-7B-Instruct-AWQ">Qwen2.5-7B-Instruct-AWQ</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="temperature">温度（Temperature）</label>
+                        <input type="range" id="temperature" min="0" max="1" step="0.1" value="0">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                            <span>0.0（确定性）</span>
+                            <span id="temperature-value">0.0</span>
+                            <span>1.0（创造性）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="max-tokens">最大标记数</label>
+                        <input type="number" id="max-tokens" value="1000" min="100" max="4000" step="100">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-block">检测真实性</button>
+                </form>
+            </div>
+            
+            <div class="spinner" id="loading-spinner"></div>
+            
+            <div id="api-response" style="display:none;">
+                <h3 class="response-header">
+                    检测结果
+                    <button class="copy-btn" id="copy-response">复制结果</button>
+                </h3>
+                <div class="card">
+                    <div id="claim-section">
+                        <h3>核心声明</h3>
+                        <p id="claim-text"></p>
+                    </div>
+                    
+                    <div id="verdict-section">
+                        <h3>判断结果</h3>
+                        <div>
+                            <span id="verdict-badge" class="verdict-badge"></span>
+                        </div>
+                    </div>
+                    
+                    <div id="reasoning-section">
+                        <h3>推理过程</h3>
+                        <p id="reasoning-text"></p>
+                    </div>
+                    
+                    <div id="evidence-section">
+                        <h3>证据来源</h3>
+                        <div id="evidence-container" class="evidence-container"></div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>原始响应</h3>
+                    <pre><code id="raw-response"></code></pre>
+                </div>
+            </div>
+            
+            <div id="api-error" class="alert alert-danger" style="display:none;"></div>
+        </section>
+        
+        <!-- 示例新闻选项卡 -->
+        <section id="examples" class="tab-content">
+            <h2>示例新闻</h2>
+            
+            <div class="info-box">
+                <p>点击以下示例将其加载到测试表单中。包含真实、虚假和模糊的新闻示例。</p>
+            </div>
+            
+            <div class="examples-container">
+                <!-- 真实新闻示例 -->
+                <div class="example-item" data-text="2022年北京冬季奥运会于2月4日至20日在中国北京举行，这是中国首次举办冬季奥运会，也是中国继2008年北京奥运会后第二次举办奥运会。">
+                    <div class="example-title">2022北京冬奥会</div>
+                    <div class="example-content">2022年北京冬季奥运会于2月4日至20日在中国北京举行，这是中国首次举办冬季奥运会，也是中国继2008年北京奥运会后第二次举办奥运会。</div>
+                </div>
+                
+                <div class="example-item" data-text="2023年中国GDP增长率为5.2%，国内生产总值达到126.06万亿元。">
+                    <div class="example-title">2023年中国GDP数据</div>
+                    <div class="example-content">2023年中国GDP增长率为5.2%，国内生产总值达到126.06万亿元。</div>
+                </div>
+                
+                <div class="example-item" data-text="地球是太阳系八大行星之一，也是太阳系中从内向外数的第三颗行星，距离太阳约1.5亿公里。">
+                    <div class="example-title">地球基本信息</div>
+                    <div class="example-content">地球是太阳系八大行星之一，也是太阳系中从内向外数的第三颗行星，距离太阳约1.5亿公里。</div>
+                </div>
+                
+                <!-- 虚假新闻示例 -->
+                <div class="example-item" data-text="2023年，中国GDP增长率达到15%，创历史新高，超过美国成为全球第一大经济体。">
+                    <div class="example-title">中国GDP虚假报道</div>
+                    <div class="example-content">2023年，中国GDP增长率达到15%，创历史新高，超过美国成为全球第一大经济体。</div>
+                </div>
+                
+                <div class="example-item" data-text="科学家发现喝热水可以有效预防和治疗新冠病毒感染，每天饮用500毫升63度的热水可降低90%的感染风险。">
+                    <div class="example-title">热水治疗新冠</div>
+                    <div class="example-content">科学家发现喝热水可以有效预防和治疗新冠病毒感染，每天饮用500毫升63度的热水可降低90%的感染风险。</div>
+                </div>
+                
+                <div class="example-item" data-text="美国宇航局NASA最新研究证实，月球表面发现大量液态水，并检测到微生物活动迹象，这表明月球可能存在生命。">
+                    <div class="example-title">月球发现液态水</div>
+                    <div class="example-content">美国宇航局NASA最新研究证实，月球表面发现大量液态水，并检测到微生物活动迹象，这表明月球可能存在生命。</div>
+                </div>
+                
+                <!-- 模糊新闻示例 -->
+                <div class="example-item" data-text="科学家表示全球气温上升可能带来严重后果，包括海平面上升、极端天气事件增加和农业产量下降等。">
+                    <div class="example-title">全球气温变化</div>
+                    <div class="example-content">科学家表示全球气温上升可能带来严重后果，包括海平面上升、极端天气事件增加和农业产量下降等。</div>
+                </div>
+                
+                <div class="example-item" data-text="某研究显示适量饮酒有益健康，尤其对心血管系统有保护作用，但专家提醒过量饮酒仍有害健康。">
+                    <div class="example-title">适量饮酒健康说</div>
+                    <div class="example-content">某研究显示适量饮酒有益健康，尤其对心血管系统有保护作用，但专家提醒过量饮酒仍有害健康。</div>
+                </div>
+                
+                <div class="example-item" data-text="专家预测明年房价将出现大幅波动，一线城市可能继续上涨，而三四线城市或将下跌，建议购房者谨慎决策。">
+                    <div class="example-title">房价预测报道</div>
+                    <div class="example-content">专家预测明年房价将出现大幅波动，一线城市可能继续上涨，而三四线城市或将下跌，建议购房者谨慎决策。</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 测试历史选项卡 -->
+        <section id="history" class="tab-content">
+            <h2>测试历史</h2>
+            
+            <div class="info-box">
+                <p>此页面显示您在当前浏览器会话中测试过的新闻。刷新页面后历史记录将被清除。</p>
+            </div>
+            
+            <div id="history-container">
+                <div class="alert alert-warning" id="no-history" style="display:block;">
+                    <p>暂无测试历史记录。请先进行新闻检测测试。</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- API信息选项卡 -->
+        <section id="api-info" class="tab-content">
+            <h2>API信息</h2>
+            
+            <div class="card">
+                <h3>API基本信息</h3>
+                <p><strong>基础URL:</strong> <code id="base-url">http://localhost:8080</code></p>
+                <p><strong>检测端点:</strong> <code>/check</code> (POST)</p>
+                <p><strong>健康检查端点:</strong> <code>/health</code> (GET)</p>
+                
+                <div id="health-status" class="alert">
+                    <p>正在检查API状态...</p>
+                </div>
+                
+                <h3>请求示例</h3>
+                <pre><code>{
+  "text": "需要核查的新闻文本",
+  "api_base": "http://localhost:8000/v1",
+  "model": "Qwen2.5-14B-Instruct-AWQ",
+  "temperature": 0.0,
+  "max_tokens": 1000
+}</code></pre>
+                
+                <h3>响应示例</h3>
+                <pre><code>{
+  "claim": "提取的核心声明",
+  "verdict": "TRUE/FALSE/PARTIALLY TRUE/UNVERIFIABLE",
+  "reasoning": "详细的推理过程",
+  "evidence": [
+    {
+      "text": "证据文本",
+      "source": "证据来源URL",
+      "similarity": 0.95
+    }
+  ],
+  "timestamp": "2025-05-18T12:34:56.789"
+}</code></pre>
+                
+                <h3>修改API基础URL</h3>
+                <form id="updateApiUrl">
+                    <div class="form-group">
+                        <label for="new-api-url">新API基础URL</label>
+                        <input type="text" id="new-api-url" placeholder="例如：http://example.com:8080">
+                    </div>
+                    <button type="submit" class="btn">更新并检查</button>
+                </form>
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>AI虚假新闻检测API测试页面 &copy; 2025</p>
+            <p>基于FastAPI和Qwen2.5 LLM</p>
+        </div>
+    </footer>
+    
+    <script>
+        // 当前API基础URL
+        let apiBaseUrl = 'http://localhost:8080';
+        
+        // 存储测试历史
+        let testHistory = [];
+        
+        // DOM加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化选项卡切换
+            initTabs();
+            
+            // 绑定表单提交事件
+            document.getElementById('checkForm').addEventListener('submit', handleFormSubmit);
+            
+            // 绑定示例点击事件
+            initExamples();
+            
+            // 绑定更新API URL表单
+            document.getElementById('updateApiUrl').addEventListener('submit', updateApiUrl);
+            
+            // 绑定温度滑块事件
+            document.getElementById('temperature').addEventListener('input', updateTemperatureValue);
+            
+            // 绑定复制按钮事件
+            document.getElementById('copy-response').addEventListener('click', copyResponseToClipboard);
+            
+            // 检查API健康状态
+            checkApiHealth();
+        });
+        
+        // 初始化选项卡功能
+        function initTabs() {
+            const tabLinks = document.querySelectorAll('.tab-link');
+            
+            tabLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // 移除所有活动状态
+                    tabLinks.forEach(l => l.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+                    
+                    // 设置当前选项卡为活动状态
+                    this.classList.add('active');
+                    const tabId = this.getAttribute('data-tab');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+        }
+        
+        // 初始化示例
+        function initExamples() {
+            const exampleItems = document.querySelectorAll('.example-item');
+            
+            exampleItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const text = this.getAttribute('data-text');
+                    document.getElementById('news-text').value = text;
+                    
+                    // 切换到测试API选项卡
+                    document.querySelector('.tab-link[data-tab="test-api"]').click();
+                    
+                    // 滚动到表单
+                    document.getElementById('news-text').scrollIntoView({ behavior: 'smooth' });
+                });
+            });
+        }
+        
+        // 更新温度值显示
+        function updateTemperatureValue() {
+            const value = document.getElementById('temperature').value;
+            document.getElementById('temperature-value').textContent = value;
+        }
+        
+        // 处理表单提交
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            // 清除旧的响应和错误
+            document.getElementById('api-response').style.display = 'none';
+            document.getElementById('api-error').style.display = 'none';
+            
+            // 显示加载动画
+            const spinner = document.getElementById('loading-spinner');
+            spinner.style.display = 'block';
+            
+            // 获取表单数据
+            const newsText = document.getElementById('news-text').value;
+            const apiBase = document.getElementById('api-base').value;
+            const model = document.getElementById('model').value;
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const maxTokens = parseInt(document.getElementById('max-tokens').value);
+            
+            // 构建请求载荷
+            const payload = {
+                text: newsText,
+                api_base: apiBase,
+                model: model,
+                temperature: temperature,
+                max_tokens: maxTokens
+            };
+            
+            try {
+                // 发送请求
+                const response = await fetch(`${apiBaseUrl}/check`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                // 隐藏加载动画
+                spinner.style.display = 'none';
+                
+                if (!response.ok) {
+                    throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                // 保存到历史记录
+                saveToHistory(newsText, result);
+                
+                // 显示响应
+                displayResponse(result);
+            } catch (error) {
+                // 隐藏加载动画
+                spinner.style.display = 'none';
+                
+                // 显示错误
+                const errorElement = document.getElementById('api-error');
+                errorElement.textContent = `错误: ${error.message}`;
+                errorElement.style.display = 'block';
+            }
+        }
+        
+        // 显示API响应
+        function displayResponse(result) {
+            // 设置核心声明
+            document.getElementById('claim-text').textContent = result.claim;
+            
+            // 设置判断结果
+            const verdictBadge = document.getElementById('verdict-badge');
+            
+            switch (result.verdict.toUpperCase()) {
+                case 'TRUE':
+                    verdictBadge.textContent = '正确';
+                    verdictBadge.className = 'verdict-badge verdict-true';
+                    break;
+                case 'FALSE':
+                    verdictBadge.textContent = '错误';
+                    verdictBadge.className = 'verdict-badge verdict-false';
+                    break;
+                case 'PARTIALLY TRUE':
+                    verdictBadge.textContent = '部分正确';
+                    verdictBadge.className = 'verdict-badge verdict-partially';
+                    break;
+                default:
+                    verdictBadge.textContent = '无法验证';
+                    verdictBadge.className = 'verdict-badge verdict-unverifiable';
+            }
+            
+            // 设置推理过程
+            document.getElementById('reasoning-text').textContent = result.reasoning;
+            
+            // 设置证据
+            const evidenceContainer = document.getElementById('evidence-container');
+            evidenceContainer.innerHTML = '';
+            
+            if (result.evidence && result.evidence.length > 0) {
+                result.evidence.forEach((item, index) => {
+                    const evidenceItem = document.createElement('div');
+                    evidenceItem.className = 'evidence-item';
+                    
+                    const evidenceText = document.createElement('div');
+                    evidenceText.textContent = item.text;
+                    
+                    const evidenceSource = document.createElement('div');
+                    evidenceSource.className = 'evidence-source';
+                    evidenceSource.textContent = `来源: ${item.source}`;
+                    
+                    if (item.similarity !== undefined) {
+                        const similarityBadge = document.createElement('span');
+                        similarityBadge.className = 'similarity-badge';
+                        similarityBadge.textContent = `相关性: ${(item.similarity * 100).toFixed(0)}%`;
+                        evidenceSource.appendChild(similarityBadge);
+                    }
+                    
+                    evidenceItem.appendChild(evidenceText);
+                    evidenceItem.appendChild(evidenceSource);
+                    evidenceContainer.appendChild(evidenceItem);
+                });
+            } else {
+                evidenceContainer.innerHTML = '<p>无可用证据</p>';
+            }
+            
+            // 设置原始响应
+            document.getElementById('raw-response').textContent = JSON.stringify(result, null, 2);
+            
+            // 显示响应区域
+            document.getElementById('api-response').style.display = 'block';
+            
+            // 滚动到响应区域
+            document.getElementById('api-response').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // 保存到历史记录
+        function saveToHistory(text, result) {
+            const historyItem = {
+                text: text,
+                result: result,
+                timestamp: new Date()
+            };
+            
+            testHistory.unshift(historyItem);
+            
+            // 更新历史记录选项卡
+            updateHistoryTab();
+        }
+        
+        // 更新历史记录选项卡
+        function updateHistoryTab() {
+            const historyContainer = document.getElementById('history-container');
+            const noHistoryAlert = document.getElementById('no-history');
+            
+            if (testHistory.length === 0) {
+                noHistoryAlert.style.display = 'block';
+                return;
+            }
+            
+            noHistoryAlert.style.display = 'none';
+            
+            // 清空历史容器
+            historyContainer.innerHTML = '';
+            
+            // 添加历史项
+            testHistory.forEach((item, index) => {
+                const historyCard = document.createElement('div');
+                historyCard.className = 'card';
+                
+                const header = document.createElement('div');
+                header.style.display = 'flex';
+                header.style.justifyContent = 'space-between';
+                header.style.alignItems = 'center';
+                header.style.marginBottom = '1rem';
+                
+                const title = document.createElement('h3');
+                title.textContent = `测试 #${testHistory.length - index}`;
+                
+                const timestamp = document.createElement('span');
+                timestamp.style.fontSize = '0.9rem';
+                timestamp.style.color = '#666';
+                timestamp.textContent = new Date(item.timestamp).toLocaleString();
+                
+                header.appendChild(title);
+                header.appendChild(timestamp);
+                
+                const newsText = document.createElement('div');
+                newsText.style.marginBottom = '1rem';
+                
+                const newsTextTitle = document.createElement('h4');
+                newsTextTitle.textContent = '新闻文本:';
+                
+                const newsTextContent = document.createElement('p');
+                newsTextContent.textContent = item.text;
+                
+                newsText.appendChild(newsTextTitle);
+                newsText.appendChild(newsTextContent);
+                
+                const result = document.createElement('div');
+                
+                const resultTitle = document.createElement('h4');
+                resultTitle.textContent = '检测结果:';
+                
+                const resultDetails = document.createElement('div');
+                resultDetails.style.display = 'flex';
+                resultDetails.style.alignItems = 'center';
+                resultDetails.style.gap = '1rem';
+                
+                const claim = document.createElement('span');
+                claim.textContent = `声明: ${item.result.claim.substring(0, 50)}${item.result.claim.length > 50 ? '...' : ''}`;
+                
+                const verdict = document.createElement('span');
+                verdict.className = 'verdict-badge';
+                
+                switch (item.result.verdict.toUpperCase()) {
+                    case 'TRUE':
+                        verdict.textContent = '正确';
+                        verdict.classList.add('verdict-true');
+                        break;
+                    case 'FALSE':
+                        verdict.textContent = '错误';
+                        verdict.classList.add('verdict-false');
+                        break;
+                    case 'PARTIALLY TRUE':
+                        verdict.textContent = '部分正确';
+                        verdict.classList.add('verdict-partially');
+                        break;
+                    default:
+                        verdict.textContent = '无法验证';
+                        verdict.classList.add('verdict-unverifiable');
+                }
+                
+                resultDetails.appendChild(claim);
+                resultDetails.appendChild(verdict);
+                
+                result.appendChild(resultTitle);
+                result.appendChild(resultDetails);
+                
+                const viewButton = document.createElement('button');
+                viewButton.className = 'btn';
+                viewButton.style.marginTop = '1rem';
+                viewButton.textContent = '查看详情';
+                viewButton.addEventListener('click', () => {
+                    // 填充表单
+                    document.getElementById('news-text').value = item.text;
+                    
+                    // 切换到测试选项卡
+                    document.querySelector('.tab-link[data-tab="test-api"]').click();
+                    
+                    // 显示响应
+                    displayResponse(item.result);
+                });
+                
+                historyCard.appendChild(header);
+                historyCard.appendChild(newsText);
+                historyCard.appendChild(result);
+                historyCard.appendChild(viewButton);
+                
+                historyContainer.appendChild(historyCard);
+            });
+        }
+        
+        // 检查API健康状态
+        async function checkApiHealth() {
+            const healthStatus = document.getElementById('health-status');
+            
+            try {
+                const response = await fetch(`${apiBaseUrl}/health`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.status === 'healthy') {
+                        healthStatus.className = 'alert alert-success';
+                        healthStatus.innerHTML = '<p>✅ API服务运行正常</p>';
+                    } else {
+                        healthStatus.className = 'alert alert-warning';
+                        healthStatus.innerHTML = '<p>⚠️ API服务状态异常</p>';
+                    }
+                } else {
+                    throw new Error('API健康检查失败');
+                }
+            } catch (error) {
+                healthStatus.className = 'alert alert-danger';
+                healthStatus.innerHTML = `<p>❌ API服务不可用: ${error.message}</p>`;
+            }
+        }
+        
+        // 更新API基础URL
+        async function updateApiUrl(e) {
+            e.preventDefault();
+            
+            const newUrl = document.getElementById('new-api-url').value.trim();
+            
+            if (newUrl) {
+                apiBaseUrl = newUrl;
+                document.getElementById('base-url').textContent = apiBaseUrl;
+                
+                // 重新检查API健康状态
+                await checkApiHealth();
+            }
+        }
+        
+        // 复制响应到剪贴板
+        function copyResponseToClipboard() {
+            const responseText = document.getElementById('raw-response').textContent;
+            
+            // 创建临时textarea
+            const textarea = document.createElement('textarea');
+            textarea.value = responseText;
+            document.body.appendChild(textarea);
+            
+            // 选择并复制
+            textarea.select();
+            document.execCommand('copy');
+            
+            // 移除临时textarea
+            document.body.removeChild(textarea);
+            
+            // 更新按钮文本反馈
+            const copyBtn = document.getElementById('copy-response');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '已复制!';
+            
+            // 还原按钮文本
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

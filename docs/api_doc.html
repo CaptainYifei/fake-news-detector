@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI虚假新闻检测 API 文档</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+            --code-bg: #f5f5f5;
+            --border-color: #ddd;
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 0;
+            margin: 0;
+        }
+        
+        header {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+        
+        header h1 {
+            margin-bottom: 0.5rem;
+        }
+        
+        header p {
+            opacity: 0.8;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        nav {
+            background-color: var(--primary-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        nav ul {
+            display: flex;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-x: auto;
+        }
+        
+        nav ul li {
+            padding: 0;
+        }
+        
+        nav ul li a {
+            display: block;
+            color: white;
+            text-decoration: none;
+            padding: 1rem 1.5rem;
+            white-space: nowrap;
+            transition: background-color 0.3s;
+        }
+        
+        nav ul li a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        section {
+            padding: 2rem 0;
+            scroll-margin-top: 3.5rem;
+        }
+        
+        h2 {
+            color: var(--secondary-color);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        h3 {
+            color: var(--primary-color);
+            margin: 1.5rem 0 1rem;
+        }
+        
+        p {
+            margin-bottom: 1rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border-color);
+        }
+        
+        th, td {
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+        
+        th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        tr:nth-child(even) {
+            background-color: rgba(0, 0, 0, 0.025);
+        }
+        
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        
+        pre {
+            background-color: var(--code-bg);
+            padding: 1rem;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid var(--border-color);
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            font-size: 0.95em;
+        }
+        
+        .endpoint {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .endpoint-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .method {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            margin-right: 1rem;
+            font-size: 0.9em;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .method-post {
+            background-color: var(--success-color);
+        }
+        
+        .method-get {
+            background-color: var(--primary-color);
+        }
+        
+        .path {
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1em;
+        }
+        
+        .response-example, .request-example {
+            margin: 1rem 0;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .info-box {
+            background-color: rgba(52, 152, 219, 0.1);
+            border-left: 4px solid var(--primary-color);
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .warning-box {
+            background-color: rgba(241, 196, 15, 0.1);
+            border-left: 4px solid var(--warning-color);
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        footer {
+            background-color: var(--secondary-color);
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 2rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 15px;
+            }
+            
+            nav ul {
+                justify-content: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>AI虚假新闻检测 API 文档</h1>
+            <p>基于大型语言模型（LLM）的虚假新闻检测服务</p>
+        </div>
+    </header>
+    
+    <nav>
+        <div class="container">
+            <ul>
+                <li><a href="#overview">概述</a></li>
+                <li><a href="#endpoints">API端点</a></li>
+                <li><a href="#examples">使用示例</a></li>
+                <li><a href="#errors">错误处理</a></li>
+                <li><a href="#implementation">实现详情</a></li>
+                <li><a href="#deployment">部署说明</a></li>
+                <li><a href="#limitations">限制说明</a></li>
+            </ul>
+        </div>
+    </nav>
+    
+    <main class="container">
+        <section id="overview">
+            <h2>概述</h2>
+            <div class="card">
+                <p>AI虚假新闻检测API是一个基于大型语言模型（LLM）的服务，能够分析新闻文本，提取核心声明，搜索相关证据，并对声明的真实性给出判断。该API使用FastAPI框架构建，支持REST请求，适合集成到各类应用程序中。</p>
+                
+                <h3>基础信息</h3>
+                <ul>
+                    <li><strong>基础URL</strong>: <code>http://localhost:8080</code></li>
+                    <li><strong>API版本</strong>: 1.0.0</li>
+                    <li><strong>默认模型</strong>: Qwen2.5-14B-Instruct-AWQ</li>
+                </ul>
+                
+                <h3>认证</h3>
+                <p>当前版本API不需要认证即可使用。API主要设计为本地或内部网络部署使用。</p>
+                
+                <div class="info-box">
+                    <p>该API利用LLM模型实现事实核查功能，确保信息的准确性和可靠性。通过自动化分析和证据检索，帮助用户识别虚假新闻。</p>
+                </div>
+            </div>
+        </section>
+        
+        <section id="endpoints">
+            <h2>API端点</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-title">
+                    <span class="method method-post">POST</span>
+                    <span class="path">/check</span>
+                </div>
+                <div class="card">
+                    <p><strong>描述</strong>: 分析输入的新闻文本，提取核心声明，并基于网络搜索的证据评估其真实性。</p>
+                    
+                    <h3>请求体</h3>
+                    <pre><code>{
+  "text": "需要核查的新闻文本",
+  "api_base": "http://localhost:8000/v1",
+  "model": "Qwen2.5-14B-Instruct-AWQ",
+  "temperature": 0.0,
+  "max_tokens": 1000
+}</code></pre>
+                    
+                    <h3>参数说明</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>参数</th>
+                                <th>类型</th>
+                                <th>必填</th>
+                                <th>默认值</th>
+                                <th>描述</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>text</td>
+                                <td>string</td>
+                                <td>是</td>
+                                <td>-</td>
+                                <td>需要核查的新闻文本</td>
+                            </tr>
+                            <tr>
+                                <td>api_base</td>
+                                <td>string</td>
+                                <td>否</td>
+                                <td>"http://localhost:8000/v1"</td>
+                                <td>LLM API的基础URL</td>
+                            </tr>
+                            <tr>
+                                <td>model</td>
+                                <td>string</td>
+                                <td>否</td>
+                                <td>"Qwen2.5-14B-Instruct-AWQ"</td>
+                                <td>使用的语言模型</td>
+                            </tr>
+                            <tr>
+                                <td>temperature</td>
+                                <td>float</td>
+                                <td>否</td>
+                                <td>0.0</td>
+                                <td>模型温度参数（0.0-1.0），越低越确定性，越高越创造性</td>
+                            </tr>
+                            <tr>
+                                <td>max_tokens</td>
+                                <td>integer</td>
+                                <td>否</td>
+                                <td>1000</td>
+                                <td>响应的最大标记数</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h3>响应</h3>
+                    <pre><code>{
+  "claim": "提取的核心声明",
+  "verdict": "TRUE/FALSE/PARTIALLY TRUE/UNVERIFIABLE",
+  "reasoning": "详细的推理过程",
+  "evidence": [
+    {
+      "text": "证据文本",
+      "source": "证据来源URL",
+      "similarity": 0.95
+    },
+    {...}
+  ],
+  "timestamp": "2025-05-18T12:34:56.789"
+}</code></pre>
+                    
+                    <h3>响应字段说明</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>字段</th>
+                                <th>类型</th>
+                                <th>描述</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>claim</td>
+                                <td>string</td>
+                                <td>从输入文本中提取的核心声明</td>
+                            </tr>
+                            <tr>
+                                <td>verdict</td>
+                                <td>string</td>
+                                <td>判断结果：TRUE（正确）、FALSE（错误）、PARTIALLY TRUE（部分正确）或UNVERIFIABLE（无法验证）</td>
+                            </tr>
+                            <tr>
+                                <td>reasoning</td>
+                                <td>string</td>
+                                <td>详细的推理过程，解释为何得出该判断</td>
+                            </tr>
+                            <tr>
+                                <td>evidence</td>
+                                <td>array</td>
+                                <td>支持判断的证据块数组</td>
+                            </tr>
+                            <tr>
+                                <td>evidence[].text</td>
+                                <td>string</td>
+                                <td>证据文本内容</td>
+                            </tr>
+                            <tr>
+                                <td>evidence[].source</td>
+                                <td>string</td>
+                                <td>证据来源URL</td>
+                            </tr>
+                            <tr>
+                                <td>evidence[].similarity</td>
+                                <td>float</td>
+                                <td>证据与声明的相关性分数（0-1之间）</td>
+                            </tr>
+                            <tr>
+                                <td>timestamp</td>
+                                <td>string</td>
+                                <td>响应生成的时间戳（ISO格式）</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="endpoint">
+                <div class="endpoint-title">
+                    <span class="method method-get">GET</span>
+                    <span class="path">/health</span>
+                </div>
+                <div class="card">
+                    <p><strong>描述</strong>: 检查API服务是否正常运行。</p>
+                    
+                    <h3>响应</h3>
+                    <pre><code>{
+  "status": "healthy"
+}</code></pre>
+                </div>
+            </div>
+        </section>
+        
+        <section id="examples">
+            <h2>使用示例</h2>
+            
+            <h3>使用curl请求</h3>
+            <div class="card">
+                <pre><code>curl -X POST "http://localhost:8080/check" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "text": "2023年，中国GDP增长率达到15%，创历史新高。",
+           "temperature": 0.0
+         }'</code></pre>
+            </div>
+            
+            <h3>Python示例</h3>
+            <div class="card">
+                <pre><code>import requests
+import json
+
+url = "http://localhost:8080/check"
+
+payload = {
+    "text": "2023年，中国GDP增长率达到15%，创历史新高。",
+    "api_base": "http://localhost:8000/v1",
+    "model": "Qwen2.5-14B-Instruct-AWQ",
+    "temperature": 0.0
+}
+
+headers = {
+    "Content-Type": "application/json"
+}
+
+response = requests.post(url, headers=headers, data=json.dumps(payload))
+result = response.json()
+print(json.dumps(result, indent=2, ensure_ascii=False))</code></pre>
+            </div>
+            
+            <h3>JavaScript示例</h3>
+            <div class="card">
+                <pre><code>async function checkNews() {
+    const url = "http://localhost:8080/check";
+    
+    const payload = {
+        text: "2023年，中国GDP增长率达到15%，创历史新高。",
+        temperature: 0.0
+    };
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await response.json();
+        console.log(result);
+    } catch (error) {
+        console.error("Error:", error);
+    }
+}</code></pre>
+            </div>
+        </section>
+        
+        <section id="errors">
+            <h2>错误处理</h2>
+            <div class="card">
+                <p>当发生错误时，API将返回标准HTTP错误代码和详细信息：</p>
+                
+                <pre><code>{
+  "detail": "事实检查过程中出错: 具体错误信息"
+}</code></pre>
+                
+                <h3>常见错误代码</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>状态码</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>400</td>
+                            <td>请求参数错误或格式不正确</td>
+                        </tr>
+                        <tr>
+                            <td>500</td>
+                            <td>服务器内部错误，如LLM API不可用或处理过程中的异常</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="warning-box">
+                    <p>注意：检查LLM服务是否正常运行，并确保提供的API基础URL是正确的。如果使用Docker部署，确保容器之间的网络连接正常。</p>
+                </div>
+            </div>
+        </section>
+        
+        <section id="implementation">
+            <h2>实现细节</h2>
+            <div class="card">
+                <h3>处理流程</h3>
+                <ol>
+                    <li><strong>声明提取</strong>：使用LLM从输入文本中提取核心声明。</li>
+                    <li><strong>证据搜索</strong>：使用DuckDuckGo搜索引擎获取相关证据。</li>
+                    <li><strong>证据排序</strong>：使用BGE-M3嵌入模型对证据块进行相关性排序。</li>
+                    <li><strong>声明评估</strong>：根据排序后的证据评估声明的真实性。</li>
+                </ol>
+                
+                <h3>依赖组件</h3>
+                <ul>
+                    <li><strong>LLM引擎</strong>：使用Qwen2.5模型进行声明提取和评估</li>
+                    <li><strong>嵌入模型</strong>：使用BGE-M3进行语义相似度计算</li>
+                    <li><strong>搜索引擎</strong>：使用DuckDuckGo API搜索相关证据</li>
+                </ul>
+                
+                <div class="info-box">
+                    <p>系统使用本地运行的Qwen2.5模型，较低的温度参数（0.0）使模型更加确定性，更适合事实检查任务。</p>
+                </div>
+            </div>
+        </section>
+        
+        <section id="deployment">
+            <h2>部署说明</h2>
+            <div class="card">
+                <h3>使用Gunicorn启动</h3>
+                <pre><code>gunicorn -c gunicorn.conf.py api:app</code></pre>
+                
+                
+                <h3>性能考量</h3>
+                <ul>
+                    <li>每个请求处理时间取决于LLM响应速度和网络搜索效率</li>
+                    <li>建议使用异步处理长时间运行的请求</li>
+                    <li>默认配置下，API使用Gunicorn启动4个worker进程，可根据硬件资源调整</li>
+                </ul>
+            </div>
+        </section>
+        
+        <section id="limitations">
+            <h2>限制说明</h2>
+            <div class="card">
+                <ul>
+                    <li>当前版本依赖外部搜索引擎获取证据，可能受网络限制</li>
+                    <li>对于非中文或英文的内容，检测准确率可能较低</li>
+                    <li>由于依赖LLM，判断结果可能存在模型固有的偏见或不准确性</li>
+                </ul>
+                
+                <div class="warning-box">
+                    <p>注意：API设计为内部网络使用，不建议直接暴露到公共互联网。如需公共访问，请增加适当的认证和速率限制机制。</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>AI虚假新闻检测API文档 &copy; 2025</p>
+            <p>基于FastAPI和Qwen2.5 LLM</p>
+        </div>
+    </footer>
+</body>
+</html>
