@@ -434,6 +434,14 @@ if "page" not in st.session_state:
 if "current_history_id" not in st.session_state:
     st.session_state.current_history_id = None
 
+# 早期检查持久登录状态 - 在任何UI显示之前
+if "user_id" not in st.session_state or st.session_state.user_id is None:
+    saved_login = auth.check_saved_login()
+    if saved_login:
+        st.session_state.user_id = saved_login['user_id']
+        st.session_state.username = saved_login['username']
+        st.session_state.persisted_login = saved_login
+
 # 检查是否已登录，否则显示登录界面
 is_authenticated = auth.show_auth_ui()
 

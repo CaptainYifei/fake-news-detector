@@ -56,3 +56,4 @@ logs/
 .claude/
 .lh/
 *.pdf
+data/
