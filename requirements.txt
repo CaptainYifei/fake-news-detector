@@ -13,7 +13,6 @@ scikit-learn>=1.6.1
 pandas>=2.2.3
 pyarrow>=19.0.1
 regex>=2024.11.6
-fpdf2
 
 # 模型相关
 torch>=2.6.0
@@ -25,3 +24,17 @@ tokenizers>=0.21.1
 pydantic>=2.10.6
 rich>=13.9.4
 python-multipart>=0.0.20
+
+# 用于 PDF 导出
+reportlab>=3.6.0
+fpdf2>=2.7.0
+
+# 用于 API 服务器
+fastapi>=0.100.0
+uvicorn>=0.20.0
+
+# 用于代理支持
+requests[socks]>=2.28.0
+
+# 用于配置文件处理
+pydantic-settings>=2.0.0

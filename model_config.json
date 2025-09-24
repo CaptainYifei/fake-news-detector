@@ -1,0 +1,176 @@
+{
+  "providers": {
+    "openai": {
+      "name": "OpenAI",
+      "type": "openai_compatible",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "${OPENAI_API_KEY}",
+      "models": {
+        "gpt-4": {
+          "name": "GPT-4",
+          "max_tokens": 8192,
+          "supports_streaming": true,
+          "supports_function_calling": true
+        },
+        "gpt-3.5-turbo": {
+          "name": "GPT-3.5 Turbo",
+          "max_tokens": 4096,
+          "supports_streaming": true
+        }
+      }
+    },
+    "lmstudio": {
+      "name": "LM Studio",
+      "type": "openai_compatible",
+      "base_url": "http://localhost:11435/v1",
+      "api_key": "lm-studio",
+      "models": {
+        "jan-v1-4b": {
+          "name": "Jan v1 4B",
+          "type": "chat",
+          "max_tokens": 4096,
+          "supports_streaming": true
+        },
+        "gemma-3-270m-it": {
+          "name": "Gemma 3 270M Instruct",
+          "type": "chat",
+          "max_tokens": 4096,
+          "supports_streaming": true
+        },
+        "text-embedding-nomic-embed-text-v1.5": {
+          "name": "Nomic Embed Text v1.5",
+          "type": "embedding",
+          "max_tokens": 8192,
+          "dimensions": 768
+        },
+        "default": {
+          "name": "Local Model",
+          "type": "chat",
+          "max_tokens": 4096,
+          "supports_streaming": true
+        }
+      }
+    },
+    "ollama": {
+      "name": "Ollama",
+      "type": "openai_compatible",
+      "base_url": "http://localhost:11434/v1",
+      "api_key": "ollama",
+      "models": {
+        "gpt-oss:120b-cloud": {
+          "name": "GPT-OSS 120B Cloud",
+          "type": "chat",
+          "max_tokens": 8192,
+          "supports_streaming": true
+        },
+        "llama3.1": {
+          "name": "Llama 3.1",
+          "max_tokens": 8192,
+          "supports_streaming": true
+        },
+        "qwen2.5": {
+          "name": "Qwen 2.5",
+          "max_tokens": 8192,
+          "supports_streaming": true
+        },
+        "nomic-embed-text:latest": {
+          "name": "Nomic Embed Text",
+          "type": "embedding",
+          "max_tokens": 8192,
+          "dimensions": 768
+        }
+      }
+    },
+    "local_api": {
+      "name": "Local API Server",
+      "type": "openai_compatible",
+      "base_url": "http://localhost:8000/v1",
+      "api_key": "EMPTY",
+      "models": {
+        "jan-v1-4b": {
+          "name": "Jan v1 4B",
+          "type": "chat",
+          "max_tokens": 4096,
+          "supports_streaming": true
+        },
+        "qwen/qwen3-4b-2507": {
+          "name": "Qwen3 4B 2507",
+          "type": "chat",
+          "max_tokens": 4096,
+          "supports_streaming": true
+        },
+        "text-embedding-nomic-embed-text-v1.5": {
+          "name": "Nomic Embed Text v1.5",
+          "type": "embedding",
+          "max_tokens": 8192,
+          "dimensions": 768
+        }
+      }
+    },
+    "custom_openai": {
+      "name": "Custom OpenAI Compatible",
+      "type": "openai_compatible",
+      "base_url": "${CUSTOM_OPENAI_BASE_URL}",
+      "api_key": "${CUSTOM_OPENAI_API_KEY}",
+      "models": {
+        "default": {
+          "name": "Custom Model",
+          "max_tokens": 4096,
+          "supports_streaming": true
+        }
+      }
+    }
+  },
+  "search_providers": {
+    "duckduckgo": {
+      "name": "DuckDuckGo",
+      "type": "duckduckgo",
+      "proxy": "socks5://127.0.0.1:20170",
+      "timeout": 60,
+      "max_results": 5,
+      "enabled": true
+    },
+    "searxng": {
+      "name": "SearXNG",
+      "type": "searxng",
+      "base_url": "http://localhost:8090",
+      "timeout": 30,
+      "max_results": 20,
+      "format": "json",
+      "categories": "general"
+    }
+  },
+  "defaults": {
+    "llm_provider": "ollama",
+    "llm_model": "gpt-oss:120b-cloud",
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text:latest",
+    "search_provider": "searxng",
+    "temperature": 0.0,
+    "max_tokens": 2000,
+    "output_language": "zh",
+    "evidence_display_multiplier": 2.5
+  },
+  "languages": {
+    "auto": {
+      "name": "Auto Detect (自动检测)",
+      "code": "auto"
+    },
+    "zh": {
+      "name": "中文 (Chinese)",
+      "code": "zh"
+    },
+    "en": {
+      "name": "English",
+      "code": "en"
+    },
+    "ja": {
+      "name": "日本語 (Japanese)",
+      "code": "ja"
+    },
+    "ko": {
+      "name": "한국어 (Korean)",
+      "code": "ko"
+    }
+  }
+}
