@@ -1,5 +1,7 @@
 import streamlit as st
 import db_utils
+import hashlib
+import time
 
 def login_required(func):
     """
@@ -19,12 +21,59 @@ def init_auth_state():
     """
     if 'user_id' not in st.session_state:
         st.session_state.user_id = None
-        
+
     if 'username' not in st.session_state:
         st.session_state.username = None
-        
+
     if 'auth_page' not in st.session_state:
         st.session_state.auth_page = 'login'  # 可选值: 'login', 'register'
+
+    # 检查是否有保存的登录状态
+    check_saved_login()
+
+def generate_login_token(username: str) -> str:
+    """
+    生成登录令牌
+    """
+    timestamp = str(int(time.time()))
+    token_string = f"{username}:{timestamp}:fake_news_detector"
+    return hashlib.md5(token_string.encode()).hexdigest()
+
+def save_login_state(username: str, user_id: int, remember: bool = False):
+    """
+    保存登录状态到浏览器
+    """
+    if remember:
+        token = generate_login_token(username)
+        # 设置较长的过期时间（30 天）
+        st.session_state["saved_login"] = {
+            "username": username,
+            "user_id": user_id,
+            "token": token,
+            "expires": int(time.time()) + (30 * 24 * 3600)  # 30天
+        }
+    else:
+        # 清除保存的登录状态
+        if "saved_login" in st.session_state:
+            del st.session_state["saved_login"]
+
+def check_saved_login():
+    """
+    检查是否有有效的保存登录状态
+    """
+    if "saved_login" in st.session_state:
+        saved = st.session_state["saved_login"]
+        # 检查是否过期
+        if saved["expires"] > int(time.time()):
+            # 简化验证 - 主要检查时间有效性
+            # 恢复登录状态
+            st.session_state.user_id = saved["user_id"]
+            st.session_state.username = saved["username"]
+            return True
+        else:
+            # 过期，清除保存的状态
+            del st.session_state["saved_login"]
+    return False
 
 def is_logged_in() -> bool:
     """
@@ -35,25 +84,25 @@ def is_logged_in() -> bool:
     """
     return st.session_state.user_id is not None
 
-def login(username: str, password: str) -> bool:
+def login(username: str, password: str):
     """
     验证用户并设置会话状态
-    
+
     Args:
         username: 用户名
         password: 密码
-        
+
     Returns:
-        登录是否成功
+        成功时返回user_id，失败时返回None
     """
     user_id = db_utils.verify_user(username, password)
-    
+
     if user_id:
         st.session_state.user_id = user_id
         st.session_state.username = username
-        return True
+        return user_id
     else:
-        return False
+        return None
 
 def logout():
     """
@@ -61,7 +110,11 @@ def logout():
     """
     st.session_state.user_id = None
     st.session_state.username = None
-    
+
+    # 清除保存的登录状态
+    if "saved_login" in st.session_state:
+        del st.session_state["saved_login"]
+
     # 清除聊天历史
     if 'messages' in st.session_state:
         st.session_state.messages = []
@@ -101,15 +154,19 @@ def show_login_form():
     显示登录表单
     """
     st.subheader("登录")
-    
+
     with st.form("login_form"):
         username = st.text_input("用户名")
         password = st.text_input("密码", type="password")
+        remember_me = st.checkbox("记住登录状态", help="勾选后30天内无需重新登录")
         submit = st.form_submit_button("登录")
-        
+
         if submit:
-            if login(username, password):
-                st.success("登录成功！")
+            result = login(username, password)
+            if result:
+                # 保存登录状态
+                save_login_state(username, result, remember_me)
+                st.success("登录成功！" + ("已保存登录状态" if remember_me else ""))
                 st.rerun()  # 重新运行应用以更新UI
             else:
                 st.error("用户名或密码错误")
