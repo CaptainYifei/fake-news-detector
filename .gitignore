@@ -51,3 +51,8 @@ logs/
 /cache/
 .streamlit/
 *.db
+
+
+.claude/
+.lh/
+*.pdf
