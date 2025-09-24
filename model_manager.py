@@ -1,10 +1,12 @@
 import json
 import os
+import re
 from typing import Dict, List, Any, Optional, Union, Tuple
 import streamlit as st
 from openai import OpenAI
 import requests
 import numpy as np
+from user_config import get_user_config_manager
 
 
 class ModelManager:
@@ -16,21 +18,149 @@ class ModelManager:
             config_path: Path to the model configuration file
         """
         self.config_path = config_path
-        self.config = self._load_config()
+        self.base_config = self._load_config()
+        self.config = self._apply_user_config(self.base_config)
         self.llm_clients = {}
         self.embedding_models = {}
 
+    def _substitute_env_vars(self, obj):
+        """Recursively substitute environment variables in configuration object."""
+        if isinstance(obj, dict):
+            return {k: self._substitute_env_vars(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._substitute_env_vars(item) for item in obj]
+        elif isinstance(obj, str) and "${" in obj and "}" in obj:
+            # Match ${ENV_VAR:-default} or ${ENV_VAR} pattern
+            pattern = r"\$\{([^}]+)\}"
+
+            def replace_match(match):
+                env_expr = match.group(1)
+                # Check if there's a default value
+                if ":-" in env_expr:
+                    env_var, default_val = env_expr.split(":-", 1)
+                    return os.getenv(env_var, default_val)
+                else:
+                    return os.getenv(
+                        env_expr, match.group(0)
+                    )  # Return original if not found
+
+            return re.sub(pattern, replace_match, obj)
+        else:
+            return obj
+
     def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from JSON file."""
+        """Load configuration from JSON file with environment variable substitution."""
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                config = json.load(f)
+            # Apply environment variable substitution
+            return self._substitute_env_vars(config)
         except FileNotFoundError:
             st.error(f"Configuration file {self.config_path} not found")
             return {}
         except json.JSONDecodeError as e:
             st.error(f"Error parsing configuration file: {e}")
             return {}
+
+    def _apply_user_config(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        应用用户配置到基础配置
+
+        Args:
+            base_config: 基础配置
+
+        Returns:
+            应用用户配置后的配置
+        """
+        user_config_manager = get_user_config_manager()
+        if not user_config_manager:
+            return base_config
+
+        user_config = user_config_manager.get_user_config()
+        if not user_config:
+            return base_config
+
+        # 深度合并配置
+        merged_config = base_config.copy()
+
+        # 应用用户模型配置
+        if "model_config" in user_config:
+            self._merge_config(merged_config, user_config["model_config"])
+
+        # 应用用户搜索配置
+        if "search_config" in user_config:
+            self._merge_config(merged_config, user_config["search_config"])
+
+        # 应用用户默认配置
+        if "default_config" in user_config:
+            self._merge_config(merged_config, user_config["default_config"])
+
+        return merged_config
+
+    def _merge_config(self, base_config: Dict[str, Any], user_config: Dict[str, Any]):
+        """
+        递归合并用户配置到基础配置
+
+        Args:
+            base_config: 基础配置（会被修改）
+            user_config: 用户配置
+        """
+        for key, value in user_config.items():
+            if (
+                key in base_config
+                and isinstance(base_config[key], dict)
+                and isinstance(value, dict)
+            ):
+                self._merge_config(base_config[key], value)
+            else:
+                base_config[key] = value
+
+    def save_user_model_config(self, model_config: Dict[str, Any]):
+        """
+        保存用户模型配置
+
+        Args:
+            model_config: 模型配置
+        """
+        user_config_manager = get_user_config_manager()
+        if user_config_manager:
+            user_config_manager.save_model_config(model_config)
+            # 重新加载配置
+            self.config = self._apply_user_config(self.base_config)
+
+    def save_user_search_config(self, search_config: Dict[str, Any]):
+        """
+        保存用户搜索配置
+
+        Args:
+            search_config: 搜索配置
+        """
+        user_config_manager = get_user_config_manager()
+        if user_config_manager:
+            user_config_manager.save_search_config(search_config)
+            # 重新加载配置
+            self.config = self._apply_user_config(self.base_config)
+
+    def save_user_defaults(self, defaults: Dict[str, Any]):
+        """
+        保存用户默认配置
+
+        Args:
+            defaults: 默认配置
+        """
+        user_config_manager = get_user_config_manager()
+        if user_config_manager:
+            user_config_manager.save_default_config(defaults)
+            # 重新加载配置
+            self.config = self._apply_user_config(self.base_config)
+
+    def reset_user_config(self):
+        """重置用户配置"""
+        user_config_manager = get_user_config_manager()
+        if user_config_manager:
+            user_config_manager.reset_config()
+            # 重新加载配置
+            self.config = self._apply_user_config(self.base_config)
 
     def get_llm_client(self, provider: str = None) -> OpenAI:
         """
@@ -216,256 +346,8 @@ class ModelManager:
 
         return []
 
-    def create_model_selection_ui(
-        self,
-    ) -> Tuple[str, str, str, str, str, str, Dict[str, Any]]:
-        """
-        创建统一的模型选择界面
-        返回: (provider_key, base_url, chat_model, embedding_model, search_provider, selected_language, provider_config)
-        """
-        providers = self.get_available_providers()
-        provider_names = {}
-
-        # 创建提供商名称映射
-        for key in providers:
-            provider_config = self.config.get("providers", {}).get(key, {})
-            provider_names[key] = provider_config.get("name", key)
-
-        # 第一级：选择提供商
-        if not providers:
-            st.error("未找到可用的模型提供商")
-            return "", "", "", "", "", "", {}
-
-        # 使用默认提供商
-        default_provider = self.config.get("defaults", {}).get(
-            "llm_provider", providers[0]
-        )
-        if default_provider not in providers:
-            default_provider = providers[0]
-
-        selected_provider_key = st.selectbox(
-            "选择模型提供商",
-            options=providers,
-            format_func=lambda x: provider_names.get(x, x),
-            index=(
-                providers.index(default_provider)
-                if default_provider in providers
-                else 0
-            ),
-            help="选择要使用的模型提供商",
-        )
-
-        provider_config = self.config.get("providers", {}).get(
-            selected_provider_key, {}
-        )
-
-        # 第二级：API端点配置
-        default_base_url = provider_config.get("base_url", "http://localhost:8000/v1")
-
-        # 处理环境变量 - 如果是环境变量格式则读取，否则保持原值
-        if default_base_url.startswith("${") and default_base_url.endswith("}"):
-            env_var = default_base_url[2:-1]
-            # 设置合适的默认值
-            if "OLLAMA" in env_var:
-                fallback = "http://localhost:11434/v1"
-            elif "LMSTUDIO" in env_var:
-                fallback = "http://localhost:11435/v1"
-            elif "SEARXNG" in env_var:
-                fallback = "http://localhost:8090"
-            else:
-                fallback = "http://localhost:8000/v1"
-            default_base_url = os.getenv(env_var, fallback)
-
-        base_url = st.text_input(
-            "API基础URL",
-            value=default_base_url,
-            help="模型API的基础URL地址",
-            key=f"base_url_{selected_provider_key}",
-        )
-
-
-        # 第三级：动态获取并选择具体模型
-        if st.button("🔄 刷新", help="重新从API获取最新的模型列表"):
-            st.rerun()
-
-        available_models = self.get_dynamic_models(selected_provider_key, base_url)
-
-        if not available_models:
-            st.warning("未找到可用的模型，请检查API连接")
-            return selected_provider_key, base_url, "", "", "", "auto", provider_config
-
-        # 分类模型：聊天模型和嵌入模型
-        chat_models = []
-        embedding_models = []
-
-        for model in available_models:
-            model_info = provider_config.get("models", {}).get(model, {})
-            model_type = model_info.get("type", "chat")
-
-            if model_type == "embedding":
-                embedding_models.append(model)
-            else:
-                chat_models.append(model)
-
-        # 如果没有分类信息，根据模型名称推断
-        if not embedding_models and not chat_models:
-            for model in available_models:
-                if ("embed" in model.lower() or
-                    "embedding" in model.lower() or
-                    "nomic" in model.lower()):  # 特别处理 nomic-embed-text
-                    embedding_models.append(model)
-                else:
-                    chat_models.append(model)
-
-        # 选择聊天模型和嵌入模型
-        col_chat, col_embed = st.columns(2)
-
-        with col_chat:
-            st.subheader("🤖 聊天模型")
-            if not chat_models:
-                st.warning("未找到聊天模型")
-                selected_chat_model = ""
-            else:
-                default_chat = self.config.get("defaults", {}).get("llm_model", "")
-                chat_index = 0
-                if default_chat in chat_models:
-                    chat_index = chat_models.index(default_chat)
-
-                selected_chat_model = st.selectbox(
-                    "选择聊天模型",
-                    options=chat_models,
-                    index=chat_index,
-                    help=f"共{len(chat_models)}个聊天模型可用",
-                    key=f"chat_{selected_provider_key}",
-                )
-
-        with col_embed:
-            st.subheader("🧠 嵌入模型")
-            if not embedding_models:
-                st.warning("未找到嵌入模型")
-                selected_embedding_model = ""
-            else:
-                default_embed = self.config.get("defaults", {}).get(
-                    "embedding_model", ""
-                )
-                embed_index = 0
-                if default_embed in embedding_models:
-                    embed_index = embedding_models.index(default_embed)
-
-                selected_embedding_model = st.selectbox(
-                    "选择嵌入模型",
-                    options=embedding_models,
-                    index=embed_index,
-                    help=f"共{len(embedding_models)}个嵌入模型可用",
-                    key=f"embed_{selected_provider_key}",
-                )
-
-        # 显示选择结果
-        if selected_chat_model or selected_embedding_model:
-            status_parts = []
-            if selected_chat_model:
-                status_parts.append(f"🤖 {selected_chat_model}")
-            if selected_embedding_model:
-                status_parts.append(f"🧠 {selected_embedding_model}")
-            st.success(
-                f"✅ {provider_names.get(selected_provider_key, selected_provider_key)}: {' | '.join(status_parts)}"
-            )
-
-        st.divider()
-        st.subheader("🔍 搜索引擎配置")
-
-        # 搜索引擎选择
-        search_providers = list(self.config.get("search_providers", {}).keys())
-        if not search_providers:
-            st.error("未配置搜索引擎")
-            selected_search_provider = ""
-        else:
-            search_names = {}
-            for key in search_providers:
-                search_config = self.config.get("search_providers", {}).get(key, {})
-                search_names[key] = search_config.get("name", key)
-
-            default_search = self.config.get("defaults", {}).get(
-                "search_provider", search_providers[0]
-            )
-            if default_search not in search_providers:
-                default_search = search_providers[0]
-
-            selected_search_provider = st.selectbox(
-                "选择搜索引擎",
-                options=search_providers,
-                format_func=lambda x: search_names.get(x, x),
-                index=(
-                    search_providers.index(default_search)
-                    if default_search in search_providers
-                    else 0
-                ),
-                help="选择用于获取证据的搜索引擎",
-            )
-
-            # 显示搜索引擎信息
-            if selected_search_provider:
-                search_config = self.config.get("search_providers", {}).get(
-                    selected_search_provider, {}
-                )
-                if search_config.get("type") == "searxng":
-                    searxng_url = st.text_input(
-                        "SearXNG API URL",
-                        value=search_config.get("base_url", "http://localhost:8090"),
-                        help="SearXNG实例的API地址",
-                        key="searxng_url",
-                    )
-                    st.info("💡 提示：确保SearXNG实例正在运行且启用了JSON API")
-                elif search_config.get("type") == "duckduckgo":
-                    st.warning("⚠️ DuckDuckGo可能需要代理设置才能正常使用")
-
-                st.success(
-                    f"🔍 搜索引擎: {search_names.get(selected_search_provider, selected_search_provider)}"
-                )
-
-        st.divider()
-        st.subheader("🌐 语言配置")
-
-        # 语言选择
-        languages = self.config.get("languages", {})
-        if languages:
-            language_names = {key: lang["name"] for key, lang in languages.items()}
-            default_lang = self.config.get("defaults", {}).get(
-                "output_language", "auto"
-            )
-
-            if default_lang not in languages:
-                default_lang = "auto"
-
-            selected_language = st.selectbox(
-                "输出语言",
-                options=list(languages.keys()),
-                format_func=lambda x: language_names.get(x, x),
-                index=(
-                    list(languages.keys()).index(default_lang)
-                    if default_lang in languages
-                    else 0
-                ),
-                help="选择AI回复的语言（自动检测将根据输入文本语言决定输出语言）",
-            )
-
-            if selected_language == "auto":
-                st.info("💡 自动检测模式：AI将根据你输入的文本语言来决定回复语言")
-            else:
-                lang_info = languages[selected_language]
-                st.success(f"🌐 输出语言: {lang_info['name']}")
-        else:
-            selected_language = "auto"
-
-        return (
-            selected_provider_key,
-            base_url,
-            selected_chat_model,
-            selected_embedding_model,
-            selected_search_provider,
-            selected_language,
-            provider_config,
-        )
+    # 注意：create_model_selection_ui 方法已移除
+    # 现在使用 app.py 中的启动时配置向导替代
 
     def test_connection(self, base_url: str, api_key: str = "EMPTY") -> bool:
         """测试与API的连接"""
@@ -485,7 +367,18 @@ class ModelManager:
 
     def get_default_config(self) -> Dict[str, Any]:
         """Get default configuration values."""
-        return self.config.get("defaults", {})
+        return self.base_config
+
+    def get_current_config(self) -> Dict[str, Any]:
+        """Get current configuration with user overrides applied."""
+        # Refresh the configuration to ensure latest user settings are applied
+        self.config = self._apply_user_config(self.base_config)
+        return self.config
+
+    def get_search_provider_config(self, provider_name: str) -> Dict[str, Any]:
+        """Get configuration for a specific search provider with user overrides applied."""
+        current_config = self.get_current_config()
+        return current_config.get("search_providers", {}).get(provider_name, {})
 
     def update_config(self, updates: Dict[str, Any]):
         """Update configuration and save to file."""

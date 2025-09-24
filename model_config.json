@@ -4,7 +4,7 @@
       "name": "OpenAI",
       "type": "openai_compatible",
       "base_url": "https://api.openai.com/v1",
-      "api_key": "${OPENAI_API_KEY}",
+      "api_key": "${OPENAI_API_KEY:-}",
       "models": {
         "gpt-4": {
           "name": "GPT-4",
@@ -22,7 +22,7 @@
     "lmstudio": {
       "name": "LM Studio",
       "type": "openai_compatible",
-      "base_url": "${LMSTUDIO_BASE_URL}",
+      "base_url": "${LMSTUDIO_BASE_URL:-http://localhost:1234}",
       "api_key": "lm-studio",
       "models": {
         "jan-v1-4b": {
@@ -54,7 +54,7 @@
     "ollama": {
       "name": "Ollama",
       "type": "openai_compatible",
-      "base_url": "${OLLAMA_BASE_URL}",
+      "base_url": "${OLLAMA_BASE_URL:-http://localhost:11434}",
       "api_key": "ollama",
       "models": {
         "gpt-oss:120b-cloud": {
@@ -110,8 +110,8 @@
     "custom_openai": {
       "name": "Custom OpenAI Compatible",
       "type": "openai_compatible",
-      "base_url": "${CUSTOM_OPENAI_BASE_URL}",
-      "api_key": "${CUSTOM_OPENAI_API_KEY}",
+      "base_url": "${CUSTOM_OPENAI_BASE_URL:-http://localhost:8000/v1}",
+      "api_key": "${CUSTOM_OPENAI_API_KEY:-EMPTY}",
       "models": {
         "default": {
           "name": "Custom Model",
@@ -133,7 +133,7 @@
     "searxng": {
       "name": "SearXNG",
       "type": "searxng",
-      "base_url": "${SEARXNG_BASE_URL}",
+      "base_url": "${SEARXNG_BASE_URL:-http://host.docker.internal:8090}",
       "timeout": 30,
       "max_results": 20,
       "format": "json",
