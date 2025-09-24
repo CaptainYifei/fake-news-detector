@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  # 虚假新闻检测应用 - 核心服务
+  fake-news-detector:
+    build: .
+    container_name: fake-news-detector-app
+    ports:
+      - "8501:8501"  # Streamlit Web 界面
+    volumes:
+      - ./data:/app/data  # 数据持久化
+      - ./factcheck.db:/app/factcheck.db  # 数据库持久化
+      - ./model_config.json:/app/model_config.json  # 配置文件
+    environment:
+      # Docker 内访问宿主机服务的地址
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+      - LMSTUDIO_BASE_URL=http://host.docker.internal:11435/v1
+      - SEARXNG_BASE_URL=http://host.docker.internal:8090
+
+    restart: unless-stopped

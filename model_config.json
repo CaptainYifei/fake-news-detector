@@ -22,7 +22,7 @@
     "lmstudio": {
       "name": "LM Studio",
       "type": "openai_compatible",
-      "base_url": "http://localhost:11435/v1",
+      "base_url": "${LMSTUDIO_BASE_URL}",
       "api_key": "lm-studio",
       "models": {
         "jan-v1-4b": {
@@ -54,7 +54,7 @@
     "ollama": {
       "name": "Ollama",
       "type": "openai_compatible",
-      "base_url": "http://localhost:11434/v1",
+      "base_url": "${OLLAMA_BASE_URL}",
       "api_key": "ollama",
       "models": {
         "gpt-oss:120b-cloud": {
@@ -133,7 +133,7 @@
     "searxng": {
       "name": "SearXNG",
       "type": "searxng",
-      "base_url": "http://localhost:8090",
+      "base_url": "${SEARXNG_BASE_URL}",
       "timeout": 30,
       "max_results": 20,
       "format": "json",

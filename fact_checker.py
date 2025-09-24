@@ -7,7 +7,6 @@ import requests
 from duckduckgo_search import DDGS
 import numpy as np
 import re
-from FlagEmbedding import BGEM3FlagModel
 
 
 class FactChecker:
@@ -17,11 +16,11 @@ class FactChecker:
         model: str,
         temperature: float,
         max_tokens: int,
-        embedding_base_url: str = "http://localhost:11435/v1",
+        embedding_base_url: str = None,
         embedding_model: str = "text-embedding-nomic-embed-text-v1.5",
         embedding_api_key: str = "lm-studio",
         search_engine: str = "searxng",
-        searxng_url: str = "http://localhost:8090",
+        searxng_url: str = None,
         output_language: str = "auto",
         search_config: dict = None,
     ):
@@ -52,6 +51,11 @@ class FactChecker:
         )
 
         # Initialize embedding client for online API
+        # 如果没有提供地址，使用环境变量或默认localhost
+        if embedding_base_url is None:
+            import os
+            embedding_base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:11435/v1")
+
         self.embedding_base_url = embedding_base_url
         self.embedding_model_name = embedding_model
         self.embedding_api_key = embedding_api_key
@@ -67,6 +71,10 @@ class FactChecker:
 
         # Search engine configuration
         self.search_engine = search_engine
+        # 如果没有提供SearXNG地址，使用环境变量或默认localhost
+        if searxng_url is None:
+            import os
+            searxng_url = os.getenv("SEARXNG_BASE_URL", "http://localhost:8090")
         self.searxng_url = searxng_url
 
         # Language configuration

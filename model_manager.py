@@ -5,8 +5,6 @@ import streamlit as st
 from openai import OpenAI
 import requests
 import numpy as np
-from FlagEmbedding import BGEM3FlagModel
-from sentence_transformers import SentenceTransformer
 
 
 class ModelManager:
@@ -96,18 +94,7 @@ class ModelManager:
             )
 
         try:
-            if provider_config["type"] == "local":
-                model = BGEM3FlagModel(
-                    provider_config["model_path"],
-                    use_fp16=provider_config.get("use_fp16", True),
-                    device=provider_config.get("device", "cuda"),
-                )
-            elif provider_config["type"] == "sentence_transformers":
-                model = SentenceTransformer(
-                    provider_config["model_name"],
-                    device=provider_config.get("device", "cpu"),
-                )
-            elif provider_config["type"] == "api":
+            if provider_config["type"] == "api":
                 model = APIEmbeddingClient(
                     provider_config["base_url"],
                     provider_config.get("api_key", "EMPTY"),
@@ -275,10 +262,19 @@ class ModelManager:
         # 第二级：API端点配置
         default_base_url = provider_config.get("base_url", "http://localhost:8000/v1")
 
-        # 处理环境变量
+        # 处理环境变量 - 如果是环境变量格式则读取，否则保持原值
         if default_base_url.startswith("${") and default_base_url.endswith("}"):
             env_var = default_base_url[2:-1]
-            default_base_url = os.getenv(env_var, "http://localhost:8000/v1")
+            # 设置合适的默认值
+            if "OLLAMA" in env_var:
+                fallback = "http://localhost:11434/v1"
+            elif "LMSTUDIO" in env_var:
+                fallback = "http://localhost:11435/v1"
+            elif "SEARXNG" in env_var:
+                fallback = "http://localhost:8090"
+            else:
+                fallback = "http://localhost:8000/v1"
+            default_base_url = os.getenv(env_var, fallback)
 
         base_url = st.text_input(
             "API基础URL",
