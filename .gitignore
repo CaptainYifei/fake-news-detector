@@ -51,3 +51,14 @@ logs/
 /cache/
 .streamlit/
 *.db
+
+
+.claude/
+.lh/
+*.pdf
+data/*
+# 但保留用户配置目录结构
+!data/user_configs/
+!data/user_configs/.gitkeep
+# 忽略具体配置文件
+data/user_configs/*.json

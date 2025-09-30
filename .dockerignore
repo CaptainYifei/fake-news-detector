@@ -1,0 +1,19 @@
+# Git和开发工具
+.git/
+.claude/
+.lh/
+.vscode/
+
+# Python缓存
+__pycache__/
+*.py[cod]
+venv/
+
+# 临时文件
+*.log
+*.tmp
+*.pdf
+test/
+
+# 系统文件
+.DS_Store
