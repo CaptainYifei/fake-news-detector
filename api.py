@@ -33,10 +33,14 @@ app.add_middleware(
 # 请求模型
 class FactCheckRequest(BaseModel):
     text: str
-    api_base: Optional[str] = "http://localhost:8000/v1"
-    model: Optional[str] = "jan-v1-4b"
+    api_base: Optional[str] = "http://localhost:11434/v1"
+    model: Optional[str] = "qwen2.5:3b"
     temperature: Optional[float] = 0.0
     max_tokens: Optional[int] = 1000
+    embedding_base_url: Optional[str] = None
+    embedding_model: Optional[str] = "bge-m3:latest"
+    search_engine: Optional[str] = "searxng"
+    searxng_url: Optional[str] = "http://localhost:8090"
 
 
 # 响应模型
@@ -45,6 +49,7 @@ class FactCheckResponse(BaseModel):
     verdict: str
     reasoning: str
     evidence: List[Dict[str, Any]]
+    pipeline: Optional[Dict[str, Any]] = None
     timestamp: str
 
 
@@ -60,30 +65,25 @@ async def check_fact(request: FactCheckRequest, background_tasks: BackgroundTask
     try:
         # 初始化FactChecker
         fact_checker = FactChecker(
-            request.api_base, request.model, request.temperature, request.max_tokens
+            request.api_base,
+            request.model,
+            request.temperature,
+            request.max_tokens,
+            embedding_base_url=request.embedding_base_url or request.api_base,
+            embedding_model=request.embedding_model,
+            search_engine=request.search_engine,
+            searxng_url=request.searxng_url,
         )
 
-        # 提取声明
-        claim = fact_checker.extract_claim(request.text)
-        # 处理claim字符串，提取"claim:"后面的内容
-        if "claim:" in claim.lower():
-            claim = claim.split("claim:")[-1].strip()
-
-        # 搜索证据
-        evidence_docs = fact_checker.search_evidence(claim)
-
-        # 获取相关证据块
-        evidence_chunks = fact_checker.get_evidence_chunks(evidence_docs, claim)
-
-        # 评估声明
-        evaluation = fact_checker.evaluate_claim(claim, evidence_chunks)
+        result = fact_checker.check_news(request.text)
 
         # 构建响应
         response = {
-            "claim": claim,
-            "verdict": evaluation["verdict"],
-            "reasoning": evaluation["reasoning"],
-            "evidence": evidence_chunks,
+            "claim": result.claim,
+            "verdict": result.verdict,
+            "reasoning": result.reasoning,
+            "evidence": result.evidence_chunks,
+            "pipeline": result.to_dict(),
             "timestamp": datetime.now().isoformat(),
         }
 

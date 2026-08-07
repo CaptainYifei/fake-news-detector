@@ -1,12 +1,13 @@
 import os
 from datetime import datetime
-from typing import Dict, List, Tuple, Any
+from typing import Dict, Iterator, List, Tuple, Any
 import streamlit as st
 from openai import OpenAI
 import requests
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 import numpy as np
 import re
+from fact_checking import FactCheckingPipeline, FactCheckResult
 
 
 class FactChecker:
@@ -17,7 +18,7 @@ class FactChecker:
         temperature: float,
         max_tokens: int,
         embedding_base_url: str = None,
-        embedding_model: str = "text-embedding-nomic-embed-text-v1.5",
+        embedding_model: str = "bge-m3:latest",
         embedding_api_key: str = "lm-studio",
         search_engine: str = "searxng",
         searxng_url: str = None,
@@ -51,10 +52,10 @@ class FactChecker:
         )
 
         # Initialize embedding client for online API
-        # 如果没有提供地址，使用环境变量或默认localhost
+        # 如果没有提供地址，使用环境变量或默认 Ollama OpenAI 兼容端点
         if embedding_base_url is None:
             import os
-            embedding_base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:11435/v1")
+            embedding_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 
         self.embedding_base_url = embedding_base_url
         self.embedding_model_name = embedding_model
@@ -82,6 +83,105 @@ class FactChecker:
 
         # Search configuration
         self.search_config = search_config or {}
+
+    def check_news(
+        self,
+        news_text: str,
+        search_results_per_query: int = 5,
+        evidence_top_k: int = 10,
+    ) -> FactCheckResult:
+        """
+        Run the redesigned three-node fact-checking pipeline.
+        """
+        pipeline = self._build_pipeline()
+        return pipeline.run(
+            news_text,
+            search_results_per_query=search_results_per_query,
+            evidence_top_k=evidence_top_k,
+        )
+
+    def check_news_stream(
+        self,
+        news_text: str,
+        search_results_per_query: int = 5,
+        evidence_top_k: int = 10,
+    ) -> Iterator[Tuple[str, Any]]:
+        """
+        Run the three-node pipeline and yield each node result as soon as it is ready.
+        """
+        pipeline = self._build_pipeline()
+
+        claim_result = pipeline.claim_node.run(news_text)
+        yield "claim", claim_result
+
+        evidence_result = pipeline.evidence_node.run(
+            claim_result=claim_result,
+            num_results=search_results_per_query,
+            top_k=evidence_top_k,
+        )
+        yield "evidence", evidence_result
+
+        verification_result = pipeline.verification_node.run(
+            claim_result=claim_result,
+            evidence_result=evidence_result,
+        )
+        yield "verification", verification_result
+
+        yield "complete", FactCheckResult(
+            original_text=news_text,
+            claim_extraction=claim_result,
+            evidence_retrieval=evidence_result,
+            verification=verification_result,
+        )
+
+    def _build_pipeline(self) -> FactCheckingPipeline:
+        return FactCheckingPipeline(
+            client=self.client,
+            model=self.model,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            detect_language=self._detect_language,
+            search_executor=self._search_by_config,
+            evidence_ranker=self._rank_evidence_for_pipeline,
+            output_language=self.output_language,
+            evidence_min_similarity=self._get_float_config(
+                "evidence_min_similarity", 0.45
+            ),
+            evidence_entity_gate=self._get_bool_config("evidence_entity_gate", True),
+            evidence_ranker_multiplier=self._get_int_config(
+                "evidence_ranker_multiplier", 3
+            ),
+        )
+
+    def _search_by_config(self, query: str, num_results: int) -> List[Dict[str, str]]:
+        if self.search_engine == "searxng":
+            return self._search_with_searxng(query, num_results)
+        return self._search_with_duckduckgo(query, num_results)
+
+    def _rank_evidence_for_pipeline(
+        self, evidence_docs: List[Dict[str, str]], claim: str, top_k: int
+    ) -> List[Dict[str, Any]]:
+        return self.get_evidence_chunks(evidence_docs, claim, top_k=top_k)
+
+    def _get_float_config(self, key: str, default: float) -> float:
+        try:
+            return float(self.search_config.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    def _get_int_config(self, key: str, default: int) -> int:
+        try:
+            return int(self.search_config.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    def _get_bool_config(self, key: str, default: bool) -> bool:
+        value = self.search_config.get(key, default)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
 
     def _detect_language(self, text: str) -> str:
         """
@@ -531,35 +631,109 @@ class FactChecker:
         """
         Search using DuckDuckGo (fallback method).
         """
-        try:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            }
-            # Use proxy from search configuration if available
-            proxy_setting = None
-            if hasattr(self, 'search_config') and 'proxy' in self.search_config:
-                proxy_setting = self.search_config['proxy']
+        # Use proxy from search configuration if available
+        proxy_setting = None
+        if hasattr(self, 'search_config') and 'proxy' in self.search_config:
+            proxy_setting = self.search_config['proxy']
 
-            # Get timeout from config
-            timeout_setting = self.search_config.get('timeout', 60)
-            ddgs = DDGS(proxy=proxy_setting, timeout=timeout_setting, headers=headers)
-            results = list(ddgs.text(query, max_results=num_results))
+        timeout_setting = self.search_config.get('timeout', 60)
+        safesearch = self.search_config.get("safesearch", "off")
+        strategies = self._get_duckduckgo_strategies()
+        errors = []
 
-            evidence_docs = []
-            for result in results:
-                evidence_docs.append(
-                    {
-                        "title": result.get("title", ""),
-                        "url": result.get("href", ""),
-                        "snippet": result.get("body", ""),
-                    }
+        for strategy in strategies:
+            backend = strategy["backend"]
+            region = strategy["region"]
+            try:
+                evidence_docs = self._search_with_duckduckgo_once(
+                    query=query,
+                    num_results=num_results,
+                    backend=backend,
+                    region=region,
+                    proxy_setting=proxy_setting,
+                    timeout_setting=timeout_setting,
+                    safesearch=safesearch,
                 )
+                if evidence_docs:
+                    return evidence_docs
 
-            return evidence_docs
+                errors.append(f"{backend}/{region}: no results")
+            except Exception as e:
+                errors.append(f"{backend}/{region}: {str(e)}")
 
-        except Exception as e:
-            st.warning(f"DuckDuckGo search failed: {str(e)}")
-            return []
+        st.warning(f"DuckDuckGo search failed after fallbacks: {'; '.join(errors)}")
+        return []
+
+    def _get_duckduckgo_strategies(self) -> List[Dict[str, str]]:
+        configured = self.search_config.get("fallback_strategies")
+        if isinstance(configured, list):
+            strategies = []
+            for item in configured:
+                if not isinstance(item, dict):
+                    continue
+                backend = str(item.get("backend") or "").strip()
+                region = str(item.get("region") or "").strip()
+                if backend and region:
+                    strategies.append({"backend": backend, "region": region})
+            if strategies:
+                return self._dedupe_duckduckgo_strategies(strategies)
+
+        backend = self.search_config.get("backend", "duckduckgo")
+        region = self.search_config.get("region", "wt-wt")
+        return self._dedupe_duckduckgo_strategies(
+            [
+                {"backend": backend, "region": region},
+                {"backend": "duckduckgo", "region": "cn-zh"},
+                {"backend": "auto", "region": "wt-wt"},
+                {"backend": "brave", "region": "wt-wt"},
+            ]
+        )
+
+    def _dedupe_duckduckgo_strategies(
+        self, strategies: List[Dict[str, str]]
+    ) -> List[Dict[str, str]]:
+        seen = set()
+        unique = []
+        for strategy in strategies:
+            key = (strategy["backend"], strategy["region"])
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(strategy)
+        return unique
+
+    def _search_with_duckduckgo_once(
+        self,
+        query: str,
+        num_results: int,
+        backend: str,
+        region: str,
+        proxy_setting: str,
+        timeout_setting: int,
+        safesearch: str,
+    ) -> List[Dict[str, str]]:
+        with DDGS(proxy=proxy_setting, timeout=timeout_setting) as ddgs:
+            results = list(
+                ddgs.text(
+                    query,
+                    backend=backend,
+                    region=region,
+                    safesearch=safesearch,
+                    max_results=num_results,
+                )
+            )
+
+        evidence_docs = []
+        for result in results:
+            evidence_docs.append(
+                {
+                    "title": result.get("title", ""),
+                    "url": result.get("href", ""),
+                    "snippet": result.get("body", ""),
+                }
+            )
+
+        return evidence_docs
 
     def get_evidence_chunks(
         self,
@@ -590,6 +764,9 @@ class FactChecker:
                     "similarity": 0.0,
                 }
             ]
+
+        if not evidence_docs:
+            return []
 
         try:
             # Create text chunks from evidence documents
@@ -640,12 +817,18 @@ class FactChecker:
                                 chunk_data['search_language'] = doc['search_language']
                             all_chunks.append(chunk_data)
 
+            if not all_chunks:
+                return []
+
             # Compute embeddings for claim using online API
             claim_embedding = self._get_embedding(claim)
 
             # Compute embeddings for chunks
             chunk_texts = [chunk["text"] for chunk in all_chunks]
             chunk_embeddings = self._get_embeddings(chunk_texts)
+
+            if claim_embedding.size == 0 or chunk_embeddings.size == 0:
+                return []
 
             # Calculate similarities
             similarities = []

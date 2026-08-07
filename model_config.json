@@ -54,7 +54,7 @@
     "ollama": {
       "name": "Ollama",
       "type": "openai_compatible",
-      "base_url": "${OLLAMA_BASE_URL:-http://localhost:11434}",
+      "base_url": "${OLLAMA_BASE_URL:-http://localhost:11434/v1}",
       "api_key": "ollama",
       "models": {
         "gpt-oss:120b-cloud": {
@@ -68,10 +68,16 @@
           "max_tokens": 8192,
           "supports_streaming": true
         },
-        "qwen2.5": {
-          "name": "Qwen 2.5",
+        "qwen2.5:3b": {
+          "name": "Qwen 2.5 3B",
           "max_tokens": 8192,
           "supports_streaming": true
+        },
+        "bge-m3:latest": {
+          "name": "BGE-M3",
+          "type": "embedding",
+          "max_tokens": 8192,
+          "dimensions": 1024
         },
         "nomic-embed-text:latest": {
           "name": "Nomic Embed Text",
@@ -125,7 +131,27 @@
     "duckduckgo": {
       "name": "DuckDuckGo",
       "type": "duckduckgo",
-      "proxy": "socks5://127.0.0.1:20170",
+      "backend": "duckduckgo",
+      "region": "wt-wt",
+      "safesearch": "off",
+      "fallback_strategies": [
+        {
+          "backend": "duckduckgo",
+          "region": "wt-wt"
+        },
+        {
+          "backend": "duckduckgo",
+          "region": "cn-zh"
+        },
+        {
+          "backend": "auto",
+          "region": "wt-wt"
+        },
+        {
+          "backend": "brave",
+          "region": "wt-wt"
+        }
+      ],
       "timeout": 60,
       "max_results": 5,
       "enabled": true
@@ -133,7 +159,7 @@
     "searxng": {
       "name": "SearXNG",
       "type": "searxng",
-      "base_url": "${SEARXNG_BASE_URL:-http://host.docker.internal:8090}",
+      "base_url": "${SEARXNG_BASE_URL:-http://localhost:8090}",
       "timeout": 30,
       "max_results": 20,
       "format": "json",
@@ -142,13 +168,17 @@
   },
   "defaults": {
     "llm_provider": "ollama",
-    "llm_model": "gpt-oss:120b-cloud",
+    "llm_model": "qwen2.5:3b",
     "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text:latest",
-    "search_provider": "searxng",
+    "embedding_model": "bge-m3:latest",
+    "search_provider": "duckduckgo",
     "temperature": 0.0,
     "max_tokens": 2000,
     "output_language": "zh",
+    "evidence_top_k": 8,
+    "evidence_min_similarity": 0.45,
+    "evidence_entity_gate": true,
+    "evidence_ranker_multiplier": 3,
     "evidence_display_multiplier": 2.5
   },
   "languages": {

@@ -8,6 +8,7 @@ import auth
 import db_utils
 from pdf_export import generate_fact_check_pdf
 from model_manager import model_manager
+from fact_checking.llm_utils import looks_like_json
 
 from reportlab.pdfgen import canvas
 from io import BytesIO
@@ -110,14 +111,14 @@ def show_initial_config_wizard():
             # 添加搜索引擎选择
             st.subheader("🔍 选择搜索引擎")
             search_options = {
-                "🦆 DuckDuckGo (推荐)": "duckduckgo",
-                "🔍 SearXNG (本地)": "searxng"
+                "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
+                "🔍 SearXNG (本地备用)": "searxng"
             }
             
             selected_search = st.radio(
                 "搜索引擎",
                 options=list(search_options.keys()),
-                help="DuckDuckGo 无需配置，SearXNG 需要本地部署",
+                help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
                 horizontal=True
             )
             
@@ -190,14 +191,14 @@ def show_initial_config_wizard():
                 # 添加搜索引擎选择
                 st.subheader("🔍 选择搜索引擎")
                 search_options = {
-                    "🦆 DuckDuckGo (推荐)": "duckduckgo",
-                    "🔍 SearXNG (本地)": "searxng"
+                    "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
+                    "🔍 SearXNG (本地备用)": "searxng"
                 }
                 
                 selected_search = st.radio(
                     "搜索引擎",
                     options=list(search_options.keys()),
-                    help="DuckDuckGo 无需配置，SearXNG 需要本地部署",
+                    help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
                     horizontal=True,
                     key="ollama_search"
                 )
@@ -245,14 +246,14 @@ def show_initial_config_wizard():
                 # 添加搜索引擎选择
                 st.subheader("🔍 选择搜索引擎")
                 search_options = {
-                    "🦆 DuckDuckGo (推荐)": "duckduckgo",
-                    "🔍 SearXNG (本地)": "searxng"
+                    "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
+                    "🔍 SearXNG (本地备用)": "searxng"
                 }
                 
                 selected_search = st.radio(
                     "搜索引擎",
                     options=list(search_options.keys()),
-                    help="DuckDuckGo 无需配置，SearXNG 需要本地部署",
+                    help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
                     horizontal=True,
                     key="lmstudio_search"
                 )
@@ -303,14 +304,14 @@ def show_initial_config_wizard():
             # 添加搜索引擎选择
             st.subheader("🔍 选择搜索引擎")
             search_options = {
-                "🦆 DuckDuckGo (推荐)": "duckduckgo",
-                "🔍 SearXNG (本地)": "searxng"
+                "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
+                "🔍 SearXNG (本地备用)": "searxng"
             }
             
             selected_search = st.radio(
                 "搜索引擎",
                 options=list(search_options.keys()),
-                help="DuckDuckGo 无需配置，SearXNG 需要本地部署",
+                help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
                 horizontal=True,
                 key="openai_search"
             )
@@ -363,14 +364,14 @@ def show_initial_config_wizard():
                         # 添加搜索引擎选择
                         st.subheader("🔍 选择搜索引擎")
                         search_options = {
-                            "🦆 DuckDuckGo (推荐)": "duckduckgo",
-                            "🔍 SearXNG (本地)": "searxng"
+                            "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
+                            "🔍 SearXNG (本地备用)": "searxng"
                         }
                         
                         selected_search = st.radio(
                             "搜索引擎",
                             options=list(search_options.keys()),
-                            help="DuckDuckGo 无需配置，SearXNG 需要本地部署",
+                            help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
                             horizontal=True,
                             key="custom_search_1"
                         )
@@ -413,14 +414,14 @@ def show_initial_config_wizard():
                         # 添加搜索引擎选择
                         st.subheader("🔍 选择搜索引擎")
                         search_options = {
-                            "🦆 DuckDuckGo (推荐)": "duckduckgo",
-                            "🔍 SearXNG (本地)": "searxng"
+                            "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
+                            "🔍 SearXNG (本地备用)": "searxng"
                         }
                         
                         selected_search = st.radio(
                             "搜索引擎",
                             options=list(search_options.keys()),
-                            help="DuckDuckGo 无需配置，SearXNG 需要本地部署",
+                            help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
                             horizontal=True,
                             key="custom_search_2"
                         )
@@ -711,6 +712,96 @@ def reset_user_config():
     if config_manager:
         config_manager.reset_config()
 
+
+def format_claim_markdown(claim_info):
+    claim_md = "### 节点 1：新闻中心声明抽取\n\n"
+    claim_md += f"**中心思想：** {claim_info.central_summary}\n\n"
+    claim_md += f"**中心声明：** {claim_info.claim}\n\n"
+    if claim_info.entities:
+        claim_md += f"**核心实体：** {'、'.join(claim_info.entities)}\n\n"
+    if claim_info.reason:
+        claim_md += f"**选择理由：** {claim_info.reason}\n\n"
+    return claim_md
+
+
+def format_evidence_markdown(evidence_info):
+    evaluation_evidence = evidence_info.evidence_chunks
+    filter_summary = evidence_info.filter_summary
+
+    evidence_md = "### 节点 2：查询改写与证据检索\n\n"
+    if evidence_info.queries:
+        evidence_md += "**查询改写：**\n\n"
+        for idx, query in enumerate(evidence_info.queries, start=1):
+            evidence_md += f"{idx}. `{query.query}`"
+            if query.purpose:
+                evidence_md += f" - {query.purpose}"
+            evidence_md += "\n"
+        evidence_md += "\n"
+
+    evidence_md += "**证据来源：**\n\n"
+    if filter_summary:
+        evidence_md += (
+            f"相关度阈值: `{filter_summary.get('min_similarity')}`；"
+            f"Top K: `{filter_summary.get('top_k')}`；"
+            f"候选: `{filter_summary.get('input_count')}`；"
+            f"保留: `{filter_summary.get('selected_count')}`\n\n"
+        )
+
+    if not evaluation_evidence:
+        evidence_md += "检索到网页，但没有达到相关度阈值和实体命中要求的证据。\n\n"
+
+    for j, chunk in enumerate(evaluation_evidence):
+        try:
+            similarity = float(chunk.get("similarity", 0))
+        except (TypeError, ValueError):
+            similarity = 0.0
+        evidence_md += f"**[{j+1}]:**\n"
+        evidence_md += f"{chunk['text']}\n"
+        evidence_md += f"相关度: {similarity:.3f}\n"
+        evidence_md += f"来源: {chunk['source']}\n\n"
+
+    return evidence_md
+
+
+def get_verdict_display(verdict):
+    normalized_verdict = verdict.upper().replace("_", " ")
+    if normalized_verdict == "TRUE":
+        return "✅", "正确"
+    if normalized_verdict == "FALSE":
+        return "❌", "错误"
+    if normalized_verdict == "PARTIALLY TRUE":
+        return "⚠️", "部分正确"
+    return "❓", "无法验证"
+
+
+def format_verdict_markdown(verification):
+    emoji, verdict_cn = get_verdict_display(verification.final_verdict)
+    verdict_md = "### 节点 3：多步分解声明验证\n\n"
+    if verification.atomic_checks:
+        verdict_md += "**原子声明核验：**\n\n"
+        for idx, check in enumerate(verification.atomic_checks, start=1):
+            verdict_md += f"**{idx}. {check.atomic_claim}**\n\n"
+            if check.five_w:
+                five_w_text = "；".join(
+                    f"{key}: {value}"
+                    for key, value in check.five_w.items()
+                    if value
+                )
+                if five_w_text:
+                    verdict_md += f"5W: {five_w_text}\n\n"
+            verdict_md += f"判定: `{check.verdict}`\n\n"
+            if check.reasoning:
+                verdict_md += f"{check.reasoning}\n\n"
+
+    reasoning_text = verification.reasoning
+    if looks_like_json(reasoning_text):
+        reasoning_text = "验证模型返回了结构化 JSON，但未能生成可直接展示的推理摘要。请以上方原子声明核验结果为准。"
+
+    verdict_md += f"### {emoji} 结论: {verdict_cn}\n\n"
+    verdict_md += f"### 推理过程\n\n{reasoning_text}\n\n"
+    return verdict_md
+
+
 def show_simplified_fact_check_page():
     """显示简化的事实核查页面 - 无复杂配置界面"""
     st.markdown(
@@ -758,10 +849,9 @@ def show_simplified_fact_check_page():
         st.divider()
         st.markdown("### 关于")
         st.markdown("虚假新闻检测器:")
-        st.markdown("1. 从新闻中提取核心声明")
-        st.markdown("2. 在网络上搜索证据")
-        st.markdown("3. 使用BGE-M3按相关性对证据进行排名")
-        st.markdown("4. 基于证据提供结论")
+        st.markdown("1. 抽取新闻中心声明")
+        st.markdown("2. 改写查询并检索证据")
+        st.markdown("3. 分解声明并逐步验证")
         st.markdown("使用Streamlit、BGE-M3和LLM开发 ❤️")
 
     # 使用已保存的配置获取参数
@@ -807,7 +897,12 @@ def show_simplified_fact_check_page():
         chat_model = config_params["chat_model"]
         embedding_model = config_params["embedding_model"]
         search_provider = config_params["search_provider"]
-        selected_language = config_params["selected_language"]
+        language_map = {
+            "自动检测": "auto",
+            "中文": "zh",
+            "English": "en",
+        }
+        selected_language = language_map.get(language, config_params["selected_language"])
         provider_config = config_params["provider_config"]
         
         if not api_base or not chat_model:
@@ -820,7 +915,15 @@ def show_simplified_fact_check_page():
 
         # 获取配置
         embedding_api_key = provider_config.get("api_key", "lm-studio")
-        search_config = model_manager.get_search_provider_config(search_provider)
+        current_defaults = model_manager.get_current_config().get("defaults", {})
+        search_config = dict(model_manager.get_search_provider_config(search_provider))
+        for key in (
+            "evidence_min_similarity",
+            "evidence_entity_gate",
+            "evidence_ranker_multiplier",
+        ):
+            if key in current_defaults:
+                search_config[key] = current_defaults[key]
         searxng_url = search_config.get("base_url", "http://localhost:8090")
         
         # 使用侧边栏的设置覆盖默认值
@@ -841,74 +944,52 @@ def show_simplified_fact_check_page():
             search_config=search_config,
         )
 
-        # 第1步：提取声明
-        claim_placeholder.markdown("### 🔍 正在提取新闻的核心声明...")
-        claim = fact_checker.extract_claim(user_input)
-        # 处理claim字符串，提取"claim:"后面的内容
-        if "claim:" in claim.lower():
-            claim = claim.split("claim:")[-1].strip()
-        claim_placeholder.markdown(f"### 🔍 提取新闻的核心声明\n\n{claim}")
+        # 三节点事实核查流水线：按节点完成顺序逐步渲染
+        claim_placeholder.markdown("### 节点 1：正在抽取新闻中心声明...")
+        evidence_placeholder.empty()
+        verdict_placeholder.empty()
 
-        # 第2步：搜索证据
-        evidence_placeholder.markdown("### 🌐 正在搜索相关证据...")
-        # 从配置中获取搜索结果数量
+        # 证据 Top K：节点 2 会先按相关度阈值和实体命中过滤，再取前 K 条
         search_max_results = search_config.get("max_results", 5)
-        evidence_docs = fact_checker.search_evidence(claim, search_max_results)
+        evidence_top_k = int(current_defaults.get("evidence_top_k", 8))
 
-        # 第3步：获取相关证据块
-        evidence_placeholder.markdown("### 🌐 正在分析证据相关性...")
-        # 动态计算展示的证据数量：基于搜索配置 * 语言数量 * 扩展倍数
-        base_results = search_config.get("max_results", 5)
-        language_count = 3  # 中英日三种语言
-        expansion_factor = (
-            model_manager.get_current_config()
-            .get("defaults", {})
-            .get("evidence_display_multiplier", 2.0)
-        )
-        max_evidence_display = int(base_results * language_count * expansion_factor)
+        result = None
+        claim_info = None
+        evidence_info = None
+        verification = None
+        claim = ""
+        evidence_md = ""
+        verdict_md = ""
+        evaluation_evidence = []
 
-        evidence_chunks = fact_checker.get_evidence_chunks(
-            evidence_docs, claim, top_k=max_evidence_display
-        )
+        for event_name, payload in fact_checker.check_news_stream(
+            user_input,
+            search_results_per_query=search_max_results,
+            evidence_top_k=evidence_top_k,
+        ):
+            if event_name == "claim":
+                claim_info = payload
+                claim = claim_info.claim
+                claim_placeholder.markdown(format_claim_markdown(claim_info))
+                evidence_placeholder.markdown("### 节点 2：正在改写查询并检索证据...")
+            elif event_name == "evidence":
+                evidence_info = payload
+                evaluation_evidence = evidence_info.evidence_chunks
+                evidence_md = format_evidence_markdown(evidence_info)
+                evidence_placeholder.markdown(evidence_md)
+                verdict_placeholder.markdown("### 节点 3：正在分解声明并逐步验证...")
+            elif event_name == "verification":
+                verification = payload
+                verdict_md = format_verdict_markdown(verification)
+                verdict_placeholder.markdown(verdict_md)
+            elif event_name == "complete":
+                result = payload
 
-        # 显示证据结果
-        evidence_md = "### 🔗 证据来源\n\n"
-        # 使用相同的证据块进行显示和评估
-        evaluation_evidence = (
-            evidence_chunks[:-1] if len(evidence_chunks) > 1 else evidence_chunks
-        )
+        if result is None or claim_info is None or evidence_info is None or verification is None:
+            st.error("事实核查流程未能完整执行，请检查模型、检索和向量服务状态。")
+            st.stop()
 
-        for j, chunk in enumerate(evaluation_evidence):
-            evidence_md += f"**[{j+1}]:**\n"
-            evidence_md += f"{chunk['text']}\n"
-            evidence_md += f"来源: {chunk['source']}\n\n"
-
-        evidence_placeholder.markdown(evidence_md)
-
-        # 第4步：评估声明
-        verdict_placeholder.markdown("### ⚖️ 正在评估声明真实性...")
-        evaluation = fact_checker.evaluate_claim(claim, evaluation_evidence)
-
-        # 确定结论表情符号
-        verdict = evaluation["verdict"]
-        if verdict.upper() == "TRUE":
-            emoji = "✅"
-            verdict_cn = "正确"
-        elif verdict.upper() == "FALSE":
-            emoji = "❌"
-            verdict_cn = "错误"
-        elif verdict.upper() == "PARTIALLY TRUE":
-            emoji = "⚠️"
-            verdict_cn = "部分正确"
-        else:
-            emoji = "❓"
-            verdict_cn = "无法验证"
-
-        # 显示最终结论
-        verdict_md = f"### {emoji} 结论: {verdict_cn}\n\n"
-        verdict_md += f"### 推理过程\n\n{evaluation['reasoning']}\n\n"
-
-        verdict_placeholder.markdown(verdict_md)
+        verdict = verification.final_verdict
 
         # 整合完整的响应内容用于保存到聊天历史
         full_response = f"""
@@ -936,7 +1017,7 @@ def show_simplified_fact_check_page():
             user_input,
             claim,
             verdict,
-            evaluation["reasoning"],
+            verification.reasoning,
             evaluation_evidence,
         )
 
@@ -996,7 +1077,7 @@ def show_history_page():
                 )
 
                 # 添加判断结果和时间
-                verdict = item["verdict"].upper()
+                verdict = item["verdict"].upper().replace("_", " ")
                 if verdict == "TRUE":
                     emoji = "✅"
                     verdict_cn = "正确"
@@ -1066,7 +1147,7 @@ def show_history_detail_page():
         st.markdown("---")
 
     # 显示判断结果
-    verdict = history_item["verdict"].upper()
+    verdict = history_item["verdict"].upper().replace("_", " ")
     if verdict == "TRUE":
         emoji = "✅"
         verdict_cn = "正确"

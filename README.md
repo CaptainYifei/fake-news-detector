@@ -6,7 +6,19 @@
 [![Streamlit](https://img.shields.io/badge/streamlit-1.43+-red.svg)](https://streamlit.io)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-![应用截图](docs/images/screenshot.png)
+![AI 虚假新闻检测器应用总览](docs/images/app-overview.png)
+
+## 🎬 项目预览
+
+系统依次完成新闻中心声明抽取、查询改写与证据检索、多步分解声明验证：
+
+![三节点事实核查流程演示](docs/images/fact-check-workflow.gif)
+
+### 🔬 方法流程
+
+下图以“西班牙 1:0 阿根廷夺冠”为简单案例，展示三个节点的输入、处理方法和中间产物：
+
+![AI 虚假新闻三节点核查手绘科研流程图](docs/images/research-workflow-handdrawn.png)
 
 ## ✨ 核心特性
 
@@ -16,16 +28,16 @@
 - **本地化界面**：完整的中英文界面支持
 
 ### 🤖 多模型提供商支持
-- **Ollama**：本地部署模型（默认：GPT-OSS 120B Cloud + Nomic Embed）
+- **Ollama**：本地部署模型（默认：Qwen2.5 3B + BGE-M3）
 - **LM Studio**：本地模型服务
 - **OpenAI**：官方 GPT 系列模型
 - **自定义API**：兼容 OpenAI 格式的任意模型服务
 
-### 🔍 高精度事实核查
-- **声明提取**：智能提取新闻核心可验证声明
-- **多源搜索**：支持 SearXNG、DuckDuckGo 等搜索引擎
-- **语义匹配**：使用先进嵌入模型计算证据相关性
-- **推理透明**：提供详细的推理过程和证据来源
+### 🔍 三节点事实核查
+- **中心声明抽取**：用 LLM 从新闻中抽取核心可验证声明
+- **查询改写检索**：用 LLM 改写多角度检索查询，默认通过 DuckDuckGo 获取网络证据
+- **多步分解验证**：用 LLM 将复杂声明拆成原子声明，结合证据逐步判断
+- **语义证据门控**：使用 BGE 系列嵌入模型计算相关性，按阈值和实体命中过滤后取 Top K
 
 ### 📊 完整的数据管理
 - **历史记录**：保存和查看所有事实核查历史
@@ -38,7 +50,8 @@
 
 - **Python 3.12+**
 - **Ollama** (推荐) 或其他兼容 OpenAI API 的模型服务
-- **SearXNG** (可选，用于搜索功能)
+- **DuckDuckGo** (默认搜索引擎)
+- **SearXNG** (可选，用于本地搜索后端)
 
 ### 安装步骤
 
@@ -59,15 +72,13 @@ pip install -r requirements.txt
 curl -fsSL https://ollama.com/install.sh | sh
 
 # 拉取推荐模型
-ollama pull gpt-oss:120b-cloud
-ollama pull nomic-embed-text:latest
+ollama pull qwen2.5:3b
+ollama pull bge-m3:latest
 ```
 
-4. **配置搜索服务** (可选)
-```bash
-# 使用 Docker 启动 SearXNG
-docker run -d -p 8090:8080 searxng/searxng
-```
+4. **配置搜索服务** (默认使用 DuckDuckGo)
+
+系统默认通过 `ddgs` 调用 DuckDuckGo，无需额外安装或部署搜索服务。如需使用本地 SearXNG，可在 `model_config.json` 中将 `search_provider` 切换为 `searxng`。
 
 ### 启动应用
 
@@ -83,6 +94,7 @@ streamlit run app.py
 fake-news-detector/
 ├── app.py                 # Streamlit 主应用
 ├── fact_checker.py        # 事实核查核心逻辑
+├── fact_checking/         # 三节点事实核查流水线
 ├── model_manager.py       # 模型管理和配置
 ├── model_config.json      # 模型和服务配置文件
 ├── auth.py                # 用户认证系统
@@ -108,25 +120,30 @@ fake-news-detector/
       "type": "openai_compatible",
       "base_url": "http://localhost:11434/v1",
       "models": {
-        "gpt-oss:120b-cloud": {
-          "name": "GPT-OSS 120B Cloud",
+        "qwen2.5:3b": {
+          "name": "Qwen2.5 3B",
           "type": "chat",
-          "max_tokens": 8192
+          "max_tokens": 32768
         },
-        "nomic-embed-text:latest": {
-          "name": "Nomic Embed Text",
+        "bge-m3:latest": {
+          "name": "BGE-M3",
           "type": "embedding",
-          "dimensions": 768
+          "dimensions": 1024
         }
       }
     }
   },
   "defaults": {
     "llm_provider": "ollama",
-    "llm_model": "gpt-oss:120b-cloud",
+    "llm_model": "qwen2.5:3b",
     "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text:latest",
-    "output_language": "zh"
+    "embedding_model": "bge-m3:latest",
+    "search_provider": "duckduckgo",
+    "output_language": "zh",
+    "evidence_top_k": 8,
+    "evidence_min_similarity": 0.45,
+    "evidence_entity_gate": true,
+    "evidence_ranker_multiplier": 3
   }
 }
 ```
@@ -134,16 +151,25 @@ fake-news-detector/
 ### 搜索引擎配置
 
 支持多种搜索引擎，可在配置文件中设置：
-- **SearXNG**: 本地部署的隐私搜索引擎
-- **DuckDuckGo**: 在线搜索（支持代理配置）
+- **DuckDuckGo**: 默认搜索引擎，使用 `ddgs` 并带多后端 fallback。默认尝试 `duckduckgo/wt-wt`、`duckduckgo/cn-zh`、`auto/wt-wt`、`brave/wt-wt`
+- **SearXNG**: 可选本地搜索服务
+
+### 证据门控配置
+
+节点 2 会先扩大候选证据池，再执行过滤，最后只把高质量证据交给节点 3：
+
+- `evidence_top_k`: 最终进入验证节点的证据数量，默认 `8`
+- `evidence_min_similarity`: BGE-M3 相关度阈值，默认 `0.45`
+- `evidence_entity_gate`: 是否要求证据命中中心声明实体，默认 `true`
+- `evidence_ranker_multiplier`: 排序候选扩展倍数，默认 `3`
+
+如果过滤后没有证据，系统会返回 `UNVERIFIABLE`，避免 LLM 在无关网页上强行生成结论。
 
 ## 🔄 工作流程
 
-1. **声明提取** - 使用 LLM 从输入文本提取核心声明
-2. **证据搜索** - 通过搜索引擎获取相关网络证据
-3. **语义排序** - 使用嵌入模型计算证据相关性
-4. **事实判断** - 基于证据进行 TRUE/FALSE/PARTIALLY TRUE 判断
-5. **结果呈现** - 提供详细推理过程和证据来源
+1. **节点 1：新闻中心声明抽取** - 对应论文第三章，使用 LLM 生成中心思想、核心可验证声明和关键实体
+2. **节点 2：查询改写与层次化证据检索** - 对应论文第四章，使用 LLM 生成多角度查询，通过 DuckDuckGo 检索，并用 BGE 系列嵌入进行语义排序、相关度阈值过滤、实体命中门控和 Top K 选择
+3. **节点 3：多步分解声明验证** - 对应论文第五章，使用 LLM 拆解原子声明、抽取 5W 要素、结合证据问答并汇总结论
 
 ## 🌐 多语言支持
 
@@ -168,9 +194,15 @@ fake-news-detector/
 python api.py
 
 # 发送核查请求
-curl -X POST http://localhost:5000/fact-check \
+curl -X POST http://localhost:8080/check \
   -H "Content-Type: application/json" \
-  -d '{"text": "需要核查的新闻内容"}'
+  -d '{
+    "text": "需要核查的新闻内容",
+    "api_base": "http://localhost:11434/v1",
+    "model": "qwen2.5:3b",
+    "embedding_model": "bge-m3:latest",
+    "search_engine": "duckduckgo"
+  }'
 ```
 
 详细 API 文档请参见 `docs/api_doc.html`
@@ -183,11 +215,34 @@ curl -X POST http://localhost:5000/fact-check \
 # 开发环境安装
 pip install -r requirements.txt
 
-# 运行测试
-python -m pytest test/
+# 配置文件校验
+python -m json.tool model_config.json >/dev/null
+
+# Python 语法检查
+python -m py_compile fact_checker.py app.py api.py fact_checking/*.py fact_checking/nodes/*.py
 
 # 启动开发服务器
 streamlit run app.py --server.runOnSave true
+```
+
+### 本地验证清单
+
+完成配置后，建议确认以下服务可用：
+
+```bash
+# Ollama 模型
+ollama list
+
+# DuckDuckGo/ddgs 检索
+python - <<'PY'
+from ddgs import DDGS
+with DDGS(timeout=30) as ddgs:
+    results = ddgs.text("2026年世界杯决赛结果", backend="auto", region="wt-wt", max_results=3)
+print([item["title"] for item in results])
+PY
+
+# Streamlit 服务
+curl -I http://127.0.0.1:8501/
 ```
 
 ### 贡献代码
@@ -204,6 +259,9 @@ streamlit run app.py --server.runOnSave true
 - ✨ 新增多语言支持 (中/英/日/韩)
 - 🔧 统一模型管理系统
 - 🌐 支持多搜索引擎 (SearXNG/DuckDuckGo)
+- 🧩 重构为声明抽取、查询改写检索、多步分解验证三节点流水线
+- 🔎 DuckDuckGo 默认检索改用 `ddgs`，并增加多后端 fallback
+- 🧪 新增证据 Top K、相关度阈值和实体命中门控
 - 📱 改进用户界面和交互体验
 - 🛡️ 增强错误处理和配置管理
 - 📄 完善 PDF 导出功能
@@ -223,6 +281,12 @@ A: 检查模型服务是否正常运行，确认 API 地址和端口配置正确
 
 **Q: 搜索功能无法使用**
 A: 检查网络连接，确认搜索引擎服务状态，必要时配置代理
+
+**Q: DuckDuckGo 返回 No results found**
+A: 系统会自动尝试 fallback 后端。如果全部失败，可临时切换到 SearXNG，或调整 `model_config.json` 中 `duckduckgo.fallback_strategies`
+
+**Q: 检索到了网页但结论是无法验证**
+A: 这通常表示网页没有通过相关度阈值或实体命中门控。可以检查页面中显示的候选数、保留数、相关度阈值和每条证据分数
 
 **Q: 多语言输出异常**
 A: 确认使用的模型支持目标语言，尝试切换到更强的模型
