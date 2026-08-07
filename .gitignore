@@ -54,6 +54,7 @@ logs/
 
 
 .claude/
+.superpowers/
 .lh/
 *.pdf
 data/*
