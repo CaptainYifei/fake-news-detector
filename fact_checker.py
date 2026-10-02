@@ -1,6 +1,7 @@
 import os
+import json
 from datetime import datetime
-from typing import Dict, Iterator, List, Tuple, Any
+from typing import Dict, Iterator, List, Tuple, Any, Optional
 import streamlit as st
 from openai import OpenAI
 import requests
@@ -8,6 +9,122 @@ from ddgs import DDGS
 import numpy as np
 import re
 from fact_checking import FactCheckingPipeline, FactCheckResult
+
+# You.com MCP 默认端点：免费档免 API Key；设置 YDC_API_KEY 后切换到已认证端点
+YOUCOM_FREE_ENDPOINT = "https://api.you.com/mcp?profile=free"
+YOUCOM_AUTH_ENDPOINT = "https://api.you.com/mcp"
+
+
+def _parse_mcp_response_events(response) -> List[Dict[str, Any]]:
+    """
+    Parse all JSON-RPC events from an MCP streamable-HTTP response.
+
+    The You.com MCP server replies with SSE (application/json, text/event-stream),
+    where a tools/call result may be preceded by progress notifications; plain
+    JSON bodies are handled as a single-event fallback. SSE payloads are UTF-8,
+    but requests falls back to ISO-8859-1 for text/event-stream responses
+    without an explicit charset, so the body is decoded explicitly here.
+    """
+    content_type = response.headers.get("Content-Type", "")
+    body = response.content.decode("utf-8", errors="replace")
+    events: List[Dict[str, Any]] = []
+
+    if "text/event-stream" in content_type:
+        for block in body.split("\n\n"):
+            data = "".join(
+                line[len("data:"):].strip()
+                for line in block.splitlines()
+                if line.startswith("data:")
+            )
+            if not data:
+                continue
+            try:
+                events.append(json.loads(data))
+            except json.JSONDecodeError:
+                continue
+    elif "application/json" in content_type and body.strip():
+        events.append(json.loads(body))
+
+    return events
+
+
+def _youcom_mcp_search(
+    query: str,
+    count: int,
+    endpoint: str,
+    api_key: Optional[str] = None,
+    timeout: int = 30,
+    proxy: Optional[str] = None,
+) -> List[Dict[str, str]]:
+    """
+    Call the you-search tool on a You.com MCP server (streamable HTTP)
+    and return the raw web results.
+    """
+    session = requests.Session()
+    if proxy:
+        session.proxies.update({"http": proxy, "https": proxy})
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    def post(payload: Dict[str, Any]) -> requests.Response:
+        response = session.post(endpoint, json=payload, headers=headers, timeout=timeout)
+        response.raise_for_status()
+        return response
+
+    # 1) initialize 握手（会话 ID 存在则回传）
+    init_response = post(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "fake-news-detector", "version": "1.0"},
+            },
+        }
+    )
+    session_id = init_response.headers.get("Mcp-Session-Id")
+    if session_id:
+        headers["Mcp-Session-Id"] = session_id
+
+    # 2) notifications/initialized
+    post({"jsonrpc": "2.0", "method": "notifications/initialized"})
+
+    # 3) tools/call you-search
+    call_response = post(
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "you-search",
+                "arguments": {"query": query, "count": max(1, count)},
+            },
+        }
+    )
+    events = _parse_mcp_response_events(call_response)
+    result_event = next(
+        (event for event in events if event.get("id") == 2 and "result" in event),
+        None,
+    )
+    if result_event is None:
+        raise RuntimeError("You.com MCP returned no search result event")
+
+    content = result_event.get("result", {}).get("content", [])
+    text = next(
+        (item.get("text") for item in content if item.get("type") == "text"),
+        None,
+    )
+    if not text:
+        raise RuntimeError("You.com MCP returned no text content")
+
+    payload = json.loads(text)
+    return payload.get("results", {}).get("web", []) or []
 
 
 class FactChecker:
@@ -36,7 +153,7 @@ class FactChecker:
             embedding_base_url: The base URL for embedding API
             embedding_model: The embedding model name
             embedding_api_key: API key for embedding service
-            search_engine: Search engine to use ('duckduckgo' or 'searxng')
+            search_engine: Search engine to use ('duckduckgo', 'searxng' or 'youcom')
             searxng_url: Base URL for SearXNG instance
         """
         self.api_base = api_base
@@ -156,6 +273,8 @@ class FactChecker:
     def _search_by_config(self, query: str, num_results: int) -> List[Dict[str, str]]:
         if self.search_engine == "searxng":
             return self._search_with_searxng(query, num_results)
+        if self.search_engine == "youcom":
+            return self._search_with_youcom(query, num_results)
         return self._search_with_duckduckgo(query, num_results)
 
     def _rank_evidence_for_pipeline(
@@ -542,6 +661,8 @@ class FactChecker:
                 # Search with translated claim
                 if self.search_engine == "searxng":
                     evidence_docs = self._search_with_searxng(translated_claim, num_results)
+                elif self.search_engine == "youcom":
+                    evidence_docs = self._search_with_youcom(translated_claim, num_results)
                 else:
                     evidence_docs = self._search_with_duckduckgo(translated_claim, num_results)
 
@@ -734,6 +855,60 @@ class FactChecker:
             )
 
         return evidence_docs
+
+    def _search_with_youcom(
+        self, query: str, num_results: int = 5
+    ) -> List[Dict[str, str]]:
+        """
+        Search using the You.com MCP server.
+
+        默认使用免 API Key 的免费档端点（profile=free）；
+        配置或环境变量提供 YDC_API_KEY 时切换到已认证端点。
+        """
+        try:
+            # Use proxy from search configuration if available
+            proxy_setting = None
+            if "proxy" in self.search_config:
+                proxy_setting = self.search_config["proxy"]
+
+            api_key = self.search_config.get("api_key") or os.getenv("YDC_API_KEY")
+            endpoint = (
+                self.search_config.get("base_url")
+                or os.getenv("YOUCOM_BASE_URL")
+                or (YOUCOM_AUTH_ENDPOINT if api_key else YOUCOM_FREE_ENDPOINT)
+            )
+            timeout_setting = self.search_config.get("timeout", 30)
+
+            web_results = _youcom_mcp_search(
+                query=query,
+                count=num_results,
+                endpoint=endpoint,
+                api_key=api_key,
+                timeout=timeout_setting,
+                proxy=proxy_setting,
+            )
+
+            evidence_docs = []
+            for result in web_results:
+                url = result.get("url", "")
+                if not url:
+                    continue
+                snippet = result.get("description", "")
+                if not snippet and result.get("snippets"):
+                    snippet = result["snippets"][0]
+                evidence_docs.append(
+                    {
+                        "title": result.get("title", ""),
+                        "url": url,
+                        "snippet": snippet,
+                    }
+                )
+
+            return evidence_docs
+
+        except Exception as e:
+            st.warning(f"You.com search failed: {str(e)}")
+            return []
 
     def get_evidence_chunks(
         self,

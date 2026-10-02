@@ -78,7 +78,7 @@ ollama pull bge-m3:latest
 
 4. **配置搜索服务** (默认使用 DuckDuckGo)
 
-系统默认通过 `ddgs` 调用 DuckDuckGo，无需额外安装或部署搜索服务。如需使用本地 SearXNG，可在 `model_config.json` 中将 `search_provider` 切换为 `searxng`。
+系统默认通过 `ddgs` 调用 DuckDuckGo，无需额外安装或部署搜索服务。如需使用本地 SearXNG，可在 `model_config.json` 中将 `search_provider` 切换为 `searxng`；也可切换为 `youcom`（You.com 远程 MCP 搜索，免 API Key，默认使用免费档端点）。
 
 ### 启动应用
 
@@ -153,6 +153,7 @@ fake-news-detector/
 支持多种搜索引擎，可在配置文件中设置：
 - **DuckDuckGo**: 默认搜索引擎，使用 `ddgs` 并带多后端 fallback。默认尝试 `duckduckgo/wt-wt`、`duckduckgo/cn-zh`、`auto/wt-wt`、`brave/wt-wt`
 - **SearXNG**: 可选本地搜索服务
+- **You.com**: 可选远程搜索引擎，通过 You.com MCP 服务检索，默认使用免 API Key 的 `profile=free` 端点（`https://api.you.com/mcp?profile=free`）；如需完整能力可设置 `YDC_API_KEY`，此时自动切换到已认证端点 `https://api.you.com/mcp`
 
 ### 证据门控配置
 
@@ -261,6 +262,7 @@ curl -I http://127.0.0.1:8501/
 - 🌐 支持多搜索引擎 (SearXNG/DuckDuckGo)
 - 🧩 重构为声明抽取、查询改写检索、多步分解验证三节点流水线
 - 🔎 DuckDuckGo 默认检索改用 `ddgs`，并增加多后端 fallback
+- 🌐 新增 You.com 免密钥远程搜索（`youcom`）作为可选搜索引擎
 - 🧪 新增证据 Top K、相关度阈值和实体命中门控
 - 📱 改进用户界面和交互体验
 - 🛡️ 增强错误处理和配置管理
@@ -283,7 +285,7 @@ A: 检查模型服务是否正常运行，确认 API 地址和端口配置正确
 A: 检查网络连接，确认搜索引擎服务状态，必要时配置代理
 
 **Q: DuckDuckGo 返回 No results found**
-A: 系统会自动尝试 fallback 后端。如果全部失败，可临时切换到 SearXNG，或调整 `model_config.json` 中 `duckduckgo.fallback_strategies`
+A: 系统会自动尝试 fallback 后端。如果全部失败，可临时切换到 You.com（免密钥远程搜索）或 SearXNG，或调整 `model_config.json` 中 `duckduckgo.fallback_strategies`
 
 **Q: 检索到了网页但结论是无法验证**
 A: 这通常表示网页没有通过相关度阈值或实体命中门控。可以检查页面中显示的候选数、保留数、相关度阈值和每条证据分数

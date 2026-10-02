@@ -164,6 +164,14 @@
       "max_results": 20,
       "format": "json",
       "categories": "general"
+    },
+    "youcom": {
+      "name": "You.com",
+      "type": "youcom",
+      "base_url": "${YOUCOM_BASE_URL:-https://api.you.com/mcp?profile=free}",
+      "timeout": 30,
+      "max_results": 5,
+      "enabled": true
     }
   },
   "defaults": {
