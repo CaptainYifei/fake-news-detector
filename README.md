@@ -164,7 +164,7 @@ pip install -r requirements-parallel.txt
 streamlit run app.py
 ```
 
-在模型配置向导的搜索引擎选项中选择 **Parallel (免 API Key)** 并保存。已有配置的用户可重新打开配置向导；也可在 `model_config.json` 的 `defaults.search_provider` 中设为 `parallel`，但已保存的用户选择会优先于该默认值。原有默认值和用户配置不会自动切换。
+在模型配置向导的搜索引擎选项中选择 **Parallel (免 API Key)** 并保存。已有配置的用户可重新打开配置向导并保存新的搜索引擎选择。原有默认值和用户配置不会自动切换。
 
 Parallel 将查询发送到 `https://search.parallel.ai/mcp`，通过 Streamable HTTP 调用 `web_search`，把网页标题、URL 和相关摘录交给现有的嵌入排序及证据门控。免费服务适合轻量使用，并有额度限制；服务失败或超时时会显示错误并返回空证据，不会静默切换搜索引擎。可在 `search_providers.parallel.timeout` 设置每次搜索的总超时秒数（默认 `30`），`max_results` 控制 Web 界面每条查询保留的结果数（默认 `5`）。
 
