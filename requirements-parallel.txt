@@ -1,0 +1,3 @@
+-r requirements.txt
+# Optional Streamable HTTP MCP client for the Parallel search provider.
+mcp>=1.26,<2

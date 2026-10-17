@@ -164,6 +164,12 @@
       "max_results": 20,
       "format": "json",
       "categories": "general"
+    },
+    "parallel": {
+      "name": "Parallel Search MCP",
+      "type": "parallel",
+      "timeout": 30,
+      "max_results": 5
     }
   },
   "defaults": {

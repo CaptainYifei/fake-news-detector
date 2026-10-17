@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import uvicorn
@@ -75,7 +76,9 @@ async def check_fact(request: FactCheckRequest, background_tasks: BackgroundTask
             searxng_url=request.searxng_url,
         )
 
-        result = fact_checker.check_news(request.text)
+        # Search providers and model clients are synchronous. Run them outside
+        # the ASGI event loop (also lets the optional MCP client own its loop).
+        result = await run_in_threadpool(fact_checker.check_news, request.text)
 
         # 构建响应
         response = {

@@ -112,13 +112,14 @@ def show_initial_config_wizard():
             st.subheader("🔍 选择搜索引擎")
             search_options = {
                 "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
-                "🔍 SearXNG (本地备用)": "searxng"
+                "🔍 SearXNG (本地备用)": "searxng",
+                "🌐 Parallel (免 API Key)": "parallel"
             }
             
             selected_search = st.radio(
                 "搜索引擎",
                 options=list(search_options.keys()),
-                help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
+                help="默认使用 DuckDuckGo；Parallel 需先安装 requirements-parallel.txt；SearXNG 可作为本地备用搜索",
                 horizontal=True
             )
             
@@ -192,13 +193,14 @@ def show_initial_config_wizard():
                 st.subheader("🔍 选择搜索引擎")
                 search_options = {
                     "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
-                    "🔍 SearXNG (本地备用)": "searxng"
+                    "🔍 SearXNG (本地备用)": "searxng",
+                    "🌐 Parallel (免 API Key)": "parallel"
                 }
                 
                 selected_search = st.radio(
                     "搜索引擎",
                     options=list(search_options.keys()),
-                    help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
+                    help="默认使用 DuckDuckGo；Parallel 需先安装 requirements-parallel.txt；SearXNG 可作为本地备用搜索",
                     horizontal=True,
                     key="ollama_search"
                 )
@@ -247,13 +249,14 @@ def show_initial_config_wizard():
                 st.subheader("🔍 选择搜索引擎")
                 search_options = {
                     "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
-                    "🔍 SearXNG (本地备用)": "searxng"
+                    "🔍 SearXNG (本地备用)": "searxng",
+                    "🌐 Parallel (免 API Key)": "parallel"
                 }
                 
                 selected_search = st.radio(
                     "搜索引擎",
                     options=list(search_options.keys()),
-                    help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
+                    help="默认使用 DuckDuckGo；Parallel 需先安装 requirements-parallel.txt；SearXNG 可作为本地备用搜索",
                     horizontal=True,
                     key="lmstudio_search"
                 )
@@ -305,13 +308,14 @@ def show_initial_config_wizard():
             st.subheader("🔍 选择搜索引擎")
             search_options = {
                 "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
-                "🔍 SearXNG (本地备用)": "searxng"
+                "🔍 SearXNG (本地备用)": "searxng",
+                "🌐 Parallel (免 API Key)": "parallel"
             }
             
             selected_search = st.radio(
                 "搜索引擎",
                 options=list(search_options.keys()),
-                help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
+                help="默认使用 DuckDuckGo；Parallel 需先安装 requirements-parallel.txt；SearXNG 可作为本地备用搜索",
                 horizontal=True,
                 key="openai_search"
             )
@@ -365,13 +369,14 @@ def show_initial_config_wizard():
                         st.subheader("🔍 选择搜索引擎")
                         search_options = {
                             "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
-                            "🔍 SearXNG (本地备用)": "searxng"
+                            "🔍 SearXNG (本地备用)": "searxng",
+                            "🌐 Parallel (免 API Key)": "parallel"
                         }
                         
                         selected_search = st.radio(
                             "搜索引擎",
                             options=list(search_options.keys()),
-                            help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
+                            help="默认使用 DuckDuckGo；Parallel 需先安装 requirements-parallel.txt；SearXNG 可作为本地备用搜索",
                             horizontal=True,
                             key="custom_search_1"
                         )
@@ -415,13 +420,14 @@ def show_initial_config_wizard():
                         st.subheader("🔍 选择搜索引擎")
                         search_options = {
                             "🦆 DuckDuckGo (默认推荐)": "duckduckgo",
-                            "🔍 SearXNG (本地备用)": "searxng"
+                            "🔍 SearXNG (本地备用)": "searxng",
+                            "🌐 Parallel (免 API Key)": "parallel"
                         }
                         
                         selected_search = st.radio(
                             "搜索引擎",
                             options=list(search_options.keys()),
-                            help="默认使用 DuckDuckGo；SearXNG 可作为本地备用搜索",
+                            help="默认使用 DuckDuckGo；Parallel 需先安装 requirements-parallel.txt；SearXNG 可作为本地备用搜索",
                             horizontal=True,
                             key="custom_search_2"
                         )
@@ -667,7 +673,8 @@ def get_search_display_name(search_provider):
     """获取搜索引擎显示名称"""
     search_names = {
         "duckduckgo": "DuckDuckGo",
-        "searxng": "SearXNG"
+        "searxng": "SearXNG",
+        "parallel": "Parallel Search MCP"
     }
     return search_names.get(search_provider, search_provider)
 
