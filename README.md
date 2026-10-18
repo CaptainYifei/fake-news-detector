@@ -153,6 +153,22 @@ fake-news-detector/
 支持多种搜索引擎，可在配置文件中设置：
 - **DuckDuckGo**: 默认搜索引擎，使用 `ddgs` 并带多后端 fallback。默认尝试 `duckduckgo/wt-wt`、`duckduckgo/cn-zh`、`auto/wt-wt`、`brave/wt-wt`
 - **SearXNG**: 可选本地搜索服务
+- **Parallel Search MCP**: 可选的免费网络证据检索，无需账号或 API Key，搜索使用 Fast 模式。配置方法见下方。
+
+#### 可选：Parallel 网络证据检索
+
+先安装可选依赖，再启动应用：
+
+```bash
+pip install -r requirements-parallel.txt
+streamlit run app.py
+```
+
+在模型配置向导的搜索引擎选项中选择 **Parallel (免 API Key)** 并保存。已有配置的用户可重新打开配置向导并保存新的搜索引擎选择。原有默认值和用户配置不会自动切换。
+
+Parallel 将查询发送到 `https://search.parallel.ai/mcp`，通过 Streamable HTTP 调用 `web_search`，把网页标题、URL 和相关摘录交给现有的嵌入排序及证据门控。免费服务适合轻量使用，并有额度限制；服务失败或超时时会显示错误并返回空证据，不会静默切换搜索引擎。可在 `search_providers.parallel.timeout` 设置每次搜索的总超时秒数（默认 `30`），`max_results` 控制 Web 界面每条查询保留的结果数（默认 `5`）。
+
+API 用户安装同一组可选依赖后，在 `/check` 请求中设置 `"search_engine": "parallel"` 即可；API 保持原有的默认搜索引擎。该集成只使用搜索摘录，不调用网页抓取工具。详见 [Parallel Search MCP 文档](https://docs.parallel.ai/integrations/mcp/search-mcp)。
 
 ### 证据门控配置
 

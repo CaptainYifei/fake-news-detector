@@ -36,7 +36,7 @@ class FactChecker:
             embedding_base_url: The base URL for embedding API
             embedding_model: The embedding model name
             embedding_api_key: API key for embedding service
-            search_engine: Search engine to use ('duckduckgo' or 'searxng')
+            search_engine: Search engine to use ('duckduckgo', 'searxng' or 'parallel')
             searxng_url: Base URL for SearXNG instance
         """
         self.api_base = api_base
@@ -83,6 +83,9 @@ class FactChecker:
 
         # Search configuration
         self.search_config = search_config or {}
+        # Reuse one anonymous search session across this fact check's queries.
+        from uuid import uuid4
+        self.parallel_session_id = uuid4().hex
 
     def check_news(
         self,
@@ -156,7 +159,24 @@ class FactChecker:
     def _search_by_config(self, query: str, num_results: int) -> List[Dict[str, str]]:
         if self.search_engine == "searxng":
             return self._search_with_searxng(query, num_results)
+        if self.search_engine == "parallel":
+            return self._search_with_parallel(query, num_results)
         return self._search_with_duckduckgo(query, num_results)
+
+    def _search_with_parallel(self, query: str, num_results: int) -> List[Dict[str, str]]:
+        try:
+            # Keep the MCP dependency optional for existing installations.
+            from parallel_search import search_parallel
+            return search_parallel(
+                query, num_results,
+                timeout=self._get_float_config("timeout", 30),
+                session_id=self.parallel_session_id,
+            )
+        except ImportError:
+            st.error("Parallel search requires: pip install -r requirements-parallel.txt")
+        except Exception:
+            st.error("Parallel search failed. Check connectivity or try again later.")
+        return []
 
     def _rank_evidence_for_pipeline(
         self, evidence_docs: List[Dict[str, str]], claim: str, top_k: int
@@ -540,10 +560,7 @@ class FactChecker:
                     st.info(f"🔍 搜索语言: {lang_code} - {translated_claim[:50]}...")
 
                 # Search with translated claim
-                if self.search_engine == "searxng":
-                    evidence_docs = self._search_with_searxng(translated_claim, num_results)
-                else:
-                    evidence_docs = self._search_with_duckduckgo(translated_claim, num_results)
+                evidence_docs = self._search_by_config(translated_claim, num_results)
 
                 # Add language metadata to evidence
                 for doc in evidence_docs:
